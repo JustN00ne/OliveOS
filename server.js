@@ -97,13 +97,6 @@ app.all('/proxy', (req, res) => {
   });
 });
 
-// --- Server Start and App Discovery Function ---
-function startServer() {
-    app.listen(PORT, () => {
-        console.log(`OliveOS Web Server running on http://localhost:${PORT}`);
-    });
-}
-
 // --- CLI ---
 program
     .name('oliveos-server-cli')
@@ -112,19 +105,11 @@ program
 program
     .command('start')
     .description('Start the OliveOS web server')
-    .action(startServer);
+    .action(() => {/* no-op for Vercel */});
 
 // Default to start if no command or 'start' is given
-if (process.argv.length <= 2 || process.argv[2] === 'start') {
-    startServer();
-} else {
+if (process.argv.length > 2 && process.argv[2] !== 'start') {
     program.parse(process.argv);
-}
-
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`OliveOS Web Server running on http://localhost:${PORT}`);
-  });
 }
 
 module.exports = app;
