@@ -58,9 +58,10 @@ const proxyHandler: RequestHandler = (req, res): void => {
     request(
         {
             url: targetUrl,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            },
+            headers:
+                {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                },
             encoding: null,
         },
         (err, response, body) => {
@@ -122,25 +123,16 @@ const proxyHandler: RequestHandler = (req, res): void => {
 
 app.all('/proxy', proxyHandler);
 
-// --- Server Start ---
-function startServer(): void {
-  app.listen(PORT, () => {
-    console.log(`OliveOS Web Server running on http://localhost:${PORT}`);
-  });
-}
+// --- Serverless Export for Vercel ---
+export default app;
 
-// --- CLI ---
-program
-  .name('oliveos-server-cli')
-  .description('OliveOS Web Server');
-
-program
-  .command('start')
-  .description('Start the OliveOS web server')
-  .action(startServer);
-
-if (process.argv.length <= 2 || process.argv[2] === 'start') {
-  startServer();
-} else {
-  program.parse(process.argv);
+// --- Server Start (only run locally, not on Vercel) ---
+if (require.main === module) {
+  if (process.argv.length <= 2 || process.argv[2] === 'start') {
+    app.listen(PORT, () => {
+      console.log(`OliveOS Web Server running on http://localhost:${PORT}`);
+    });
+  } else {
+    program.parse(process.argv);
+  }
 }
