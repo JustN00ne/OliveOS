@@ -37,6 +37,7 @@ app.set('views', path.join(__dirname, 'public'));
 // --- Static File Serving ---
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 // --- Home Route ---
 app.get('/', (req, res) => {
@@ -48,68 +49,52 @@ app.all('/proxy', (req, res) => {
   const targetUrl = req.method === 'POST' ? req.body.url : req.query.url;
   if (!targetUrl) return res.status(400).send('Missing ?url');
 
-  request(
-    {
-      url: targetUrl,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-      },
-      encoding: null, // allow binary data
+  request({
+    url: targetUrl,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
     },
-    (err, response, body) => {
-      if (err || !response) return res.status(500).send('Request failed');
-
-      const contentType = response.headers['content-type'] || '';
-      res.removeHeader('Content-Security-Policy');
-      res.removeHeader('X-Frame-Options');
-      res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;");
-      res.setHeader('X-Frame-Options', 'ALLOWALL');
-
-      // Handle HTML by rewriting assets
-      if (contentType.includes('text/html')) {
-        const html = iconv.decode(body, 'utf-8'); // decode for cheerio
-        const $ = cheerio.load(html);
-
-        // Tags to rewrite
-        const rewriteAttrs = {
-          img: 'src',
-          script: 'src',
-          link: 'href',
-          iframe: 'src',
-          source: 'src',
-          video: 'src',
-          audio: 'src',
-          form: 'action',
-        };
-
-        Object.entries(rewriteAttrs).forEach(([tag, attr]) => {
-          $(tag).each((_, el) => {
-            const $el = $(el);
-            const val = $el.attr(attr);
-            if (!val || val.startsWith('data:') || val.startsWith('blob:') || val.startsWith('javascript:')) return;
-
-            const abs = new URL(val, targetUrl).toString();
-
-            // Special handling for form: make sure it still submits through proxy
-            if (tag === 'form') {
-              $el.attr(attr, '/proxy');
-              // Add hidden input to preserve original destination
-              $el.prepend(`<input type="hidden" name="url" value="${abs}">`);
-            } else {
-              $el.attr(attr, `/proxy?url=${encodeURIComponent(abs)}`);
-            }
-          });
+    encoding: null,
+  }, (err, response, body) => {
+    if (err || !response) return res.status(500).send('Request failed');
+    const contentType = response.headers['content-type'] || '';
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;");
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    if (contentType.includes('text/html')) {
+      const html = iconv.decode(body, 'utf-8');
+      const $ = cheerio.load(html);
+      const rewriteAttrs = {
+        img: 'src',
+        script: 'src',
+        link: 'href',
+        iframe: 'src',
+        source: 'src',
+        video: 'src',
+        audio: 'src',
+        form: 'action',
+      };
+      Object.entries(rewriteAttrs).forEach(([tag, attr]) => {
+        $(tag).each((_, el) => {
+          const $el = $(el);
+          const val = $el.attr(attr);
+          if (!val || val.startsWith('data:') || val.startsWith('blob:') || val.startsWith('javascript:')) return;
+          const abs = new URL(val, targetUrl).toString();
+          if (tag === 'form') {
+            $el.attr(attr, '/proxy');
+            $el.prepend(`<input type=\"hidden\" name=\"url\" value=\"${abs}\">`);
+          } else {
+            $el.attr(attr, `/proxy?url=${encodeURIComponent(abs)}`);
+          }
         });
-
-        res.setHeader('Content-Type', 'text/html');
-        return res.send($.html());
-      }
-
-      // Non-HTML: just proxy the raw data
-      res.setHeader('Content-Type', contentType);
-      res.send(body);
+      });
+      res.setHeader('Content-Type', 'text/html');
+      return res.send($.html());
     }
-  );
+    res.setHeader('Content-Type', contentType);
+    res.send(body);
+  });
 });
 
 // --- Server Start and App Discovery Function ---
@@ -135,3 +120,11 @@ if (process.argv.length <= 2 || process.argv[2] === 'start') {
 } else {
     program.parse(process.argv);
 }
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`OliveOS Web Server running on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
