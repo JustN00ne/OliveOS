@@ -4,7 +4,6 @@ const express = require('express');
 const path = require('path');
 const exphbs = require('express-handlebars');
 const fs = require('fs-extra');
-const { program } = require('commander');
 const { createClient } = require('@supabase/supabase-js');
 const fetch = require('node-fetch');
 const request = require('request');
@@ -97,19 +96,6 @@ app.all('/proxy', (req, res) => {
   });
 });
 
-// --- CLI ---
-program
-    .name('oliveos-server-cli')
-    .description('OliveOS Web Server');
-
-program
-    .command('start')
-    .description('Start the OliveOS web server')
-    .action(() => {/* no-op for Vercel */});
-
-// Default to start if no command or 'start' is given
-if (process.argv.length > 2 && process.argv[2] !== 'start') {
-    program.parse(process.argv);
-}
+// --- CLI logic removed for Vercel compatibility ---
 
 module.exports = app;
