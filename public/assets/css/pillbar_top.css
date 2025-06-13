@@ -1,0 +1,217 @@
+.pill_top_notfbar{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    background-color: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.pill_top_notfbar > *{
+    pointer-events: auto;
+}
+
+.controlbar_m{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    height: calc(55px - 30px);
+
+    border-radius: 700px;
+    background-color: var(--color-dark-m-t);
+    backdrop-filter: blur(10px);
+    animation: slide 1s var(--easing-main);
+
+    padding: 15px 13.5px;
+
+    gap: 10px;
+    overflow: hidden;
+}
+
+.time_ctr{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 80px;
+    flex-direction: column;
+    height: calc(55px - 30px);
+
+    border-radius: 700px;
+    background-color: var(--color-dark-m-t);
+    backdrop-filter: blur(10px);
+    animation: slide 1s var(--easing-main);
+
+    padding: 15px 40px;
+
+    overflow: hidden;
+
+    color: var(--color-light-mode);
+}
+
+.time_ctr > *{
+    animation: fade forwards 2s var(--easing-main);
+}
+
+@keyframes slide {
+    from{
+        background-color: rgba(43, 43, 43, 0);
+        transform: translateY(-150%);
+        scale: 0.8;
+        filter: blur(2px);
+    }
+    to{
+        transform: translateY(0);
+        background-color: var(--color-dark-m-t);
+        scale: 1;
+        filter: blur(0px);
+    }
+}
+
+@keyframes fade {
+    from{
+        opacity: 0;
+        filter: blur(2px);
+    }
+}
+
+.controlbar_m > * > *{
+    scale: 0.6;
+    display: flex;
+    gap: 5px;
+    transition: all 0.3s var(--easing-main);
+    align-items: center;
+    animation: fadeInDown 0.3s var(--easing-main) forwards;
+    opacity: 0;
+    transform: translateY(-100%);
+}
+
+.controlbar_m > *{
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s var(--easing-main);
+    border-radius: 100px;
+    padding: 2px;
+    display: flex;
+    color: var(--color-light-mode);
+    flex-direction: row;
+    width: fit-content;
+    overflow: hidden;
+}
+
+.button_control_wifi{
+    background-color: var(--color-evening-sky);
+}
+
+.button_control_wifi:hover{
+    background-color: var(--color-blueberry);
+    transition: all 0.3s var(--easing-main);
+}
+
+.button_control_wifi:hover > *{
+    scale: 0.5;
+    transition: all 0.3s var(--easing-main);
+}
+
+.button_control_battery{
+    background-color: var(--color-menthol-fresh);
+}
+
+.button_control_headphones{
+    background-color: var(--color-jello);
+}
+
+.button_control_dnd{
+    background-color: var(--color-tomato);
+}
+
+.button_control_dnd:hover{
+    background-color: var(--color-candy);
+}
+
+.button_control_dnd:hover>span>svg{
+    transform: translateY(-2px);
+    animation: wiggle 1s;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    animation-timing-function: var(--easing-wiggle);
+}
+
+.button_control_notif{
+    background-color: var(--color-sunset);
+}
+
+.button_control_notif:hover{
+    background-color: var(--color-berry-bush);
+}
+
+.button_control_notif:hover>span>svg{
+    animation: bounce 1s;
+    animation-iteration-count: 1;
+    animation-fill-mode: forwards;
+    animation-timing-function: var(--easing-wiggle);
+}
+
+.hidden-anim {
+  opacity: 0;
+  transform: translateY(-100%);
+  filter: blur(10px);
+}
+
+.animated-item {
+  opacity: 0;
+  transform: translateY(-100%);
+  animation: fadeInDown 1s var(--easing-out) forwards;
+  
+}
+
+@keyframes fadeInDown {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes wiggle {
+    0% { transform: rotate(0deg);}
+    25% { transform: rotate(5deg);}
+    50% { transform: rotate(-5deg);}
+    75% { transform: rotate(2deg);}
+    100% { transform: rotate(0deg);}
+}
+
+@keyframes bounce {
+    0% {
+        transform: rotate(0deg) translateY(0);
+    }
+    20% {
+        transform: rotate(-14deg) translateY(-5px);
+    }
+    50% {
+        transform: rotate(14deg) translateY(-5px);
+    }
+    70% {
+        transform: rotate(-14deg) translateY(-3px);
+    }
+
+    100% {
+        transform: rotate(0deg) translateY(0);
+    }
+}
+
+.time_hb{
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.date_hb{
+    font-size: 0.7rem;
+    opacity: 0.75;
+}

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OliveOS</title>
+
+    <link rel="stylesheet" href="/assets/css/index.css">
+    <link rel="stylesheet" href="/assets/css/pillbar_top.css">
+    <link rel="stylesheet" href="/assets/css/application_basis.css">
+    <link rel="stylesheet" href="/assets/css/taskbar.css">
+
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <link rel="icon" href="/assets/image/fav/logo.svg" type="image/x-icon" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="/assets/image/fav/logo-d.svg" type="image/x-icon" media="(prefers-color-scheme: light)">
+
+    <meta name="theme-color" content="#ffffff">
+    <meta name="description" content="OliveOS - A modern web operating system experience.">
+    <meta name="keywords" content="OliveOS, Olive, OS, WebOS">
+    <meta name="author" content="JustNoone">
+</head>
+<body>
+    
+    <div class="background_container">
+        <img src="{{background_image_main}}" alt="background_img_main" id="background_img_main">
+    </div>
+
+    <div class="pill_top_notfbar">
+        <div class="controlbar_m">
+            <div class="button_control_wifi hidden-anim">
+                <i data-feather="wifi"></i>
+            </div>
+            <div class="button_control_battery hidden-anim">
+                <i data-feather="battery-charging"></i>
+            </div>
+            <div class="button_control_headphones hidden-anim">
+                <span><i data-feather="headphones"></i> Headphones</span>
+            </div>
+            <div class="button_control_dnd hidden-anim">
+                <span><i data-feather="bell-off"></i> DND</span>
+            </div>
+            <div class="button_control_notif hidden-anim">
+                <span><i data-feather="bell"></i> {{notif_count}}</span>
+            </div>
+        </div>
+
+        <div class="time_ctr">
+            <span id="time_currently" class="time_hb">12:34:56</span>
+            <span id="date_currently" class="date_hb">01.01.2025</span>
+        </div>
+    </div>
+
+    <div class="app_window">
+        <div class="head_m">
+            <div class="buttons_control">
+                <button class="close_b_a_m" onclick="alert('This feature is not implemented yet!');">
+                    <i data-feather="x"></i>
+                </button>
+                <button class="min_b_a_m" onclick="alert('This feature is not implemented yet!');">
+                    <i data-feather="minimize"></i>
+                </button>
+                <button class="windowcontrol_b_a_m" onclick="alert('This feature is not implemented yet!');">
+                    <i data-feather="external-link"></i>
+                </button>
+            </div>
+            <div class="app_divider">
+
+            </div>
+            <div class="app_icon">
+                <img src="{{dynamic_applogo_uuid}}" alt="icon" class="icon_img">
+            </div>
+            <span class="app_name">{{dynamic_appname_uuid}}</span>
+            <span class="dynamic_title">{{dynamic_title_uuid}}</span>
+        </div>
+        <div class="app_content">
+            <iframe src="{{dynamic_appurl_uuid}}" class="app_iframe" frameborder="0" allowfullscreen ></iframe>
+        </div>
+    </div>
+
+    <!-- Add apps based on this format >> class="app_window {{uuid}}"-->
+
+    <div class="taskbar_wrapper">
+        <div class="taskbar">
+
+            <div class="logo_container_main">
+                <svg>
+                    <svg viewBox="0 0 51 51" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M25.5 0C39.5833 0 51 11.4167 51 25.5C51 39.5833 39.5833 51 25.5 51C11.4167 51 0 39.5833 0 25.5C0 11.4167 11.4167 0 25.5 0ZM32.79 5.2334C25.8699 5.23348 20.2598 10.8435 20.2598 17.7637C20.26 24.6837 25.87 30.2929 32.79 30.293C39.7101 30.293 45.3201 24.6837 45.3203 17.7637C45.3203 10.8434 39.7103 5.2334 32.79 5.2334Z" fill="#FAFAFA"/>
+                    </svg>
+                </svg>
+            </div>
+
+            <div class="divider_tb"></div>
+
+            <div class="app_wrapper">
+                <!-- Append apps here -->
+            </div>
+
+        </div>
+
+    </div>
+
+    <script src="./index.js"></script>
+</body>
+</html>

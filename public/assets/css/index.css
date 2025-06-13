@@ -1,0 +1,139 @@
+:root {
+    /* Primary Palette */
+    --color-tomato: #F84E68;
+    --color-greek-tangerine: #FFA726;
+    --color-bright-neon-green: #9CCC65;
+    --color-menthol-fresh: #66BB6A;
+    --color-evening-sky: #176586;
+    --color-blueberry: #6651CE;
+    --color-jello: #AB47BC; /* Assuming Jello is Purple */
+    --color-berry-bush: #BF398E; /* Assuming Berry Bush is Magenta */
+    --color-sunset: #D81B60;
+    --color-tar: #424242;
+    --color-cloudy-day: #78909C;
+    --color-deep-sea: #37474F; /* Added name for Dark Blue/Grey */
+    --color-salmon: #FFA07A;
+    --color-paintjob: #D4E157;
+    --color-dreamy-blue: #7E57C2;
+    --color-candy: #F06292;
+
+    /* Brand & Utility Palette */
+    --color-muted-sicilian-green: #827717;
+    --color-italian-olive: #556B2F;
+    --color-dark-camo: #1B1B1B;
+    --color-light-mode: #FFFFFF;
+
+    --color-text: #3C3C3C;
+
+    --color-dark-m-t: rgba(43, 43, 43, 0.75);
+
+    --easing-main: cubic-bezier(0.5, 0.18, 0, 1);
+    --easing-out: cubic-bezier(0.063, 0.715, 0.34, 1);
+    --easing_wiggle: linear(0, 0.438 2.9%, 0.609 4.3%, 0.74 5.6%, 0.842 6.9%, 0.915 8.2%, 0.938 8.8%, 0.957 9.5%, 0.967 10.1%, 0.971 10.8%, 0.968 11.4%, 0.959 12%, 0.923 13.3%, 0.864 14.6%, 0.78 16%, 0.592 18.5%, 0.062 24.7%, -0.063 26.4%, -0.165 28%, -0.242 29.5%, -0.299 30.9%, -0.342 32.4%, -0.356 33.1%, -0.367 33.9%, -0.372 34.5%, -0.375 35.1%, -0.375 35.7%, -0.373 36.3%, -0.361 37.6%, -0.34 38.9%, -0.311 40.2%, -0.274 41.6%, -0.087 47.7%, -0.008 50.7%, 0.026 52.3%, 0.053 53.9%, 0.072 55.5%, 0.086 57.2%, 0.091 58.4%, 0.092 59.6%, 0.091 60.9%, 0.086 62.3%, 0.072 64.8%, 0.033 70.2%, 0.017 72.8%, 0.004 75.5%, -0.005 78.3%, -0.008 80.6%, -0.008 83.2%, -0.001 93.3%, 0);
+    --easing_bounce: linear(0, 0.76 4.4%, 0.928 6.2%, 0.984 8%, 0.92 9.9%, 0.731 11.9%, -0.506 20.3%, -0.667 22.2%, -0.731 24%, -0.731 24.8%, -0.712 25.7%, -0.615 27.5%, 0.252 35.9%, 0.4 38.1%, 0.463 40.3%, 0.455 41.9%, 0.399 43.7%, -0.106 51.9%, -0.195 54.1%, -0.235 56.3%, -0.235 57.9%, -0.209 59.7%, 0.019 67.5%, 0.061 69.6%, 0.082 71.7%, 0.085 73.3%, 0.077 75.1%, 0.011 81.9%, -0.009 85.5%, 0);
+}
+
+/* Gramatika Trial Font Faces */
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-BlackItalic.otf') format('opentype');
+  font-weight: 900;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-ExtraLight.otf') format('opentype');
+  font-weight: 200;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-ExtraLightItalic.otf') format('opentype');
+  font-weight: 200;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-Italic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-LightItalic.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Gramatika';
+  src: url('../fonts/GramatikaTrial-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+body{
+    font-family: 'Gramatika', Arial, sans-serif;
+    background-color: var(--color-italian-olive);
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.background_container, #background_img_main{
+    width: 100%;
+    height: 100vh;
+    transition: all 0.5s var(--easing-main);
+}
+
+.background_container{
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1; /* Ensure background is behind other content */
+  display: flex;
+}
+
+#background_img_main{
+    position: absolute;
+    top: 0;
+    left: 0;
+    object-fit: cover;
+    z-index: -1; /* Ensure background is behind other content */
+}

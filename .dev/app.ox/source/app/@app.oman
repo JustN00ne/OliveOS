@@ -1,0 +1,8 @@
+@#[sources]
+index = /app/index.html
+
+@#[styles]
+index = /app/index.css  
+
+@#[scripts]
+index = /app/index.js

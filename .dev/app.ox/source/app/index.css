@@ -1,0 +1,70 @@
+body {
+    font-family: 'Inter', Arial, sans-serif;
+    background: #23272f;
+    color: #fff;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+#notepad-container {
+    background: #292d36;
+    border-radius: 18px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    padding: 32px 28px 24px 28px;
+    min-width: 340px;
+    max-width: 90vw;
+    min-height: 320px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+#notepad-container h1 {
+    margin-top: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 18px;
+}
+#notepad-textarea {
+    width: 100%;
+    min-height: 160px;
+    border-radius: 10px;
+    border: none;
+    padding: 14px;
+    font-size: 1.1rem;
+    background: #23272f;
+    color: #fff;
+    resize: vertical;
+    margin-bottom: 18px;
+    box-sizing: border-box;
+}
+.notepad-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.notepad-actions button {
+    background: #4f8cff;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 22px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.notepad-actions button#clear-btn {
+    background: #ff4f4f;
+}
+.notepad-actions button:hover {
+    filter: brightness(1.1);
+}
+#notepad-status {
+    font-size: 0.95rem;
+    color: #b3b3b3;
+    min-height: 18px;
+    margin-top: 2px;
+}
