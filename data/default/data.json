@@ -1,7 +1,11 @@
 {
+
+
   "background_image_main": "/assets/image/default/bg.jpg",
   "dynamic_applogo_uuid": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Youtube_Music_icon.svg/1200px-Youtube_Music_icon.svg.png",
   "dynamic_appname_uuid": "YouTube Music",
   "dynamic_title_uuid": "Home",
-  "dynamic_appurl_uuid": "/proxy?url=https://music.youtube.com/"
+  "dynamic_appurl_uuid": "/proxy?url=https://music.youtube.com/",
+
+  "notif_count": "5+"
 }
