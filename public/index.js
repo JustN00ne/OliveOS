@@ -333,15 +333,22 @@ async function loadDynamicApps() {
             workingDir = workingDir.trim().replace(/\\/g, '/').replace(/\s+/g, '');
             // Remove trailing slash for workingDir
             if (workingDir.endsWith('/')) workingDir = workingDir.slice(0, -1);
-            let htmlFile = appOman.sources?.index || 'index.html';
-            htmlFile = htmlFile.trim().replace(/\\/g, '/').replace(/\s+/g, '');
-            // Remove leading slash for htmlFile
-            if (htmlFile.startsWith('/')) htmlFile = htmlFile.slice(1);
+            // Compose iframe path using @app.oman sources
+            let htmlFile = 'index.html';
+            if (appOman.sources) {
+                // Find the first file that exists in sources
+                for (const key in appOman.sources) {
+                    if (appOman.sources[key]) {
+                        htmlFile = appOman.sources[key].trim().replace(/\\/g, '/').replace(/\s+/g, '');
+                        if (htmlFile.startsWith('/')) htmlFile = htmlFile.slice(1);
+                        break;
+                    }
+                }
+            }
             // Compose iframe path
             let iframePath = `/${appRoot}/${folder}` + (workingDir ? `/${workingDir}` : '') + `/${htmlFile}`;
             // Fix double slashes in iframePath except after http(s):
             iframePath = iframePath.replace(/\\/g, '/').replace(/\s+/g, '');
-            // Remove accidental double slashes (//) except after protocol
             iframePath = iframePath.replace(/([^:])\/+/g, '$1/');
             // Try both possible icon locations
             let appIcon = undefined;
