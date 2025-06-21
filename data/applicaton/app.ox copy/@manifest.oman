@@ -1,0 +1,22 @@
+# OliveOS App Manifest
+@#[app]
+id = "com.example.myapp"           # Unique identifier for the app
+name = "MyApp"                     # Display name of the app
+version = "1.0.0"                  # Semantic version
+author = "YourName"                # Creator of the app
+description = "A simple OliveOS demo application."
+icon = "/source/assets/icon.png"                  # Relative path to app icon (optional)
+
+@#[runtime]
+entry = "app.ox"                  # Entry point executable file
+args = ""                          # Command-line arguments if any
+working_directory = "/source/app/"           # Working directory for the app
+permissions = "filesystem, network"  # Comma-separated list of required permissions
+
+@#[ui]
+type = "windowed"                  # Options: windowed, fullscreen, background
+width = "800"                      # Initial window width
+height = "600"                     # Initial window height
+resizable = "true"                 # Whether the window is resizable
+fullscreen = "false"               # Whether the app runs in fullscreen mode
+

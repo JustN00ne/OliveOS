@@ -46,8 +46,8 @@
 .buttons_control>*{
     opacity: 1;
     border-radius: 100%;
-    width: 20px;
-    height: 20px;
+    width: 17px;
+    height: 17px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -115,4 +115,34 @@
     border: none;
     border-radius: 5px;
     overflow: hidden;
+    background-color: white;
+    
+}
+
+.app_window.dragging {
+    transition: none !important;
+    box-shadow: 0 16px 48px 8px rgba(0,0,0,0.28);
+    opacity: 0.98;
+    cursor: grabbing;
+}
+.head_m.drag_handle {
+    cursor: grab;
+    user-select: none;
+}
+
+.fade-hover {
+  transition: filter 0.25s, opacity 0.25s;
+}
+.fade-hover:hover .fade-icon,
+.fade-hover:hover i,
+.fade-hover:hover img {
+  opacity: 1;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12));
+}
+.fade-icon, .fade-hover i, .fade-hover img {
+  opacity: 0.6;
+  transition: opacity 0.25s, filter 0.25s;
+}
+.fade-hover:hover {
+  filter: brightness(1.1);
 }

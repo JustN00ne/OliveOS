@@ -1,0 +1,12 @@
+{
+  "watch": [
+    "server.js",
+    "public/",
+    "data/"
+  ],
+  "ext": "js,json,hbs,css",
+  "ignore": [
+    "public/assets/fonts/*"
+  ],
+  "exec": "node server.js"
+}

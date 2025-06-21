@@ -106,3 +106,33 @@
     object-fit: contain;
     border-radius: 4px; /* Slight rounding for the image itself if smaller than container */
 }
+
+.app_window.show-app {
+    opacity: 1;
+    pointer-events: auto;
+    animation: appIn 0.22s var(--easing-main);
+}
+.app_window.focused {
+    box-shadow: 0 12px 36px rgba(0,0,0,0.22);
+    border: 2px solid var(--color-blueberry);
+}
+.app_window.minimized {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+
+/* Animation for app window */
+@keyframes appIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* Responsive scaling for app content */
+@media (max-width: 700px) {
+    .app_window {
+        width: 98vw !important;
+        left: 1vw !important;
+        min-width: 0;
+    }
+}

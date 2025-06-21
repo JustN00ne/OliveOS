@@ -137,3 +137,17 @@ body{
     object-fit: cover;
     z-index: -1; /* Ensure background is behind other content */
 }
+
+.tooltip{
+  padding: 5px 10px;
+  background-color: var(--color-dark-m-t);
+  color: var(--color-light-mode);
+  border-radius: 1000px;
+  border-bottom-left-radius: 0px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  font-size: 14px;
+  transform: translateX(55%);
+  transition: transform 0.3s var(--easing-main), opacity 0.3s var(--easing-main), opacity 0.3s var(--easing-main);
+  backdrop-filter: blur(10px);
+  border: 1px solid #ffffff22;
+}
