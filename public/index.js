@@ -164,6 +164,10 @@ function setupTooltips() {
     });
 }
 
+// Remove all pointer events for the pill_top_notfbar class
+const pillBar = document.querySelector('.pill_top_notfbar');
+if (pillBar) pillBar.style.pointerEvents = 'none';
+
 // --- App System ---
 const appTemplates = [
     {
@@ -182,6 +186,13 @@ function createAppWindow(app) {
     const win = document.createElement('div');
     win.className = 'app_window hidden';
     win.id = app.id;
+    // Set user-select to none when dragging or minimized
+    function setUserSelectNone(val) {
+        win.style.userSelect = val ? 'none' : '';
+        win.style.webkitUserSelect = val ? 'none' : '';
+        win.style.MozUserSelect = val ? 'none' : '';
+        win.style.msUserSelect = val ? 'none' : '';
+    }
     // Icon fallback logic: try main, fallback if error
     let iconHtml = '';
     if (app.icon && app.icon.endsWith('.png')) {
@@ -215,6 +226,43 @@ function createAppWindow(app) {
     win.style.top = '200px';
     win.style.width = '700px';
     win.style.height = '400px';
+    // --- Disable iframe pointer events while resizing ---
+    let resizing = false;
+    let resizeObserver = new ResizeObserver(() => {
+        if (!resizing) return;
+        const iframe = win.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'none';
+        // Remove all transitions/animations while resizing
+        win.style.transition = 'none';
+        win.style.animation = 'none';
+        if (iframe) iframe.style.transition = 'none';
+        if (iframe) iframe.style.animation = 'none';
+    });
+    win.addEventListener('mousedown', function(e) {
+        if (e.target === win && win.style.resize !== 'none') {
+            resizing = true;
+            const iframe = win.querySelector('iframe');
+            if (iframe) iframe.style.pointerEvents = 'none';
+            // Remove all transitions/animations at start of resize
+            win.style.transition = 'none';
+            win.style.animation = 'none';
+            if (iframe) iframe.style.transition = 'none';
+            if (iframe) iframe.style.animation = 'none';
+        }
+    });
+    win.addEventListener('mouseup', function() {
+        if (resizing) {
+            resizing = false;
+            const iframe = win.querySelector('iframe');
+            if (iframe) iframe.style.pointerEvents = '';
+            // Restore transitions/animations after resize
+            win.style.transition = '';
+            win.style.animation = '';
+            if (iframe) iframe.style.transition = '';
+            if (iframe) iframe.style.animation = '';
+        }
+    });
+    resizeObserver.observe(win);
     // Animate in
     setTimeout(() => {
         win.classList.add('anim-opening');
@@ -227,30 +275,37 @@ function createAppWindow(app) {
         setTimeout(() => closeApp(app.id), 220);
     };
     win.querySelector('.min_b_a_m').onclick = () => {
+        setUserSelectNone(true);
         win.classList.add('anim-minimizing');
+        // Disable pointer events on iframe during minimize
+        const iframe = win.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'none';
         setTimeout(() => {
             win.classList.remove('anim-minimizing');
             minimizeApp(app.id);
+            setUserSelectNone(false);
+            // After fade out, hide window
+            win.style.display = 'none';
+            // Restore iframe pointer events for when unminimized
+            if (iframe) iframe.style.pointerEvents = '';
         }, 220);
     };
     // Maximize button is disabled for now
     // Add drag events
-    makeWindowDraggable(win);
+    makeWindowDraggable(win, setUserSelectNone);
     setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 0);
     return win;
 }
 
-function makeWindowDraggable(win) {
+function makeWindowDraggable(win, setUserSelectNone) {
     const dragHandle = win.querySelector('.drag_handle');
     let isDragging = false;
     let startX, startY, startLeft, startTop;
     let animationFrame;
     let winRect, winWidth, winHeight;
-
     function clamp(val, min, max) {
         return Math.max(min, Math.min(max, val));
     }
-
     function onMouseDown(e) {
         if (e.button !== 0) return;
         isDragging = true;
@@ -262,6 +317,7 @@ function makeWindowDraggable(win) {
         winWidth = winRect.width;
         winHeight = winRect.height;
         win.classList.add('dragging');
+        if (setUserSelectNone) setUserSelectNone(true);
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
         e.preventDefault();
@@ -282,6 +338,7 @@ function makeWindowDraggable(win) {
     function onMouseUp() {
         isDragging = false;
         win.classList.remove('dragging');
+        if (setUserSelectNone) setUserSelectNone(false);
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
     }
@@ -298,6 +355,7 @@ function makeWindowDraggable(win) {
         winWidth = winRect.width;
         winHeight = winRect.height;
         win.classList.add('dragging');
+        if (setUserSelectNone) setUserSelectNone(true);
         document.addEventListener('touchmove', onTouchMove, {passive:false});
         document.addEventListener('touchend', onTouchEnd);
         e.preventDefault();
@@ -317,6 +375,7 @@ function makeWindowDraggable(win) {
     function onTouchEnd() {
         isDragging = false;
         win.classList.remove('dragging');
+        if (setUserSelectNone) setUserSelectNone(false);
         document.removeEventListener('touchmove', onTouchMove);
         document.removeEventListener('touchend', onTouchEnd);
     }
@@ -374,7 +433,10 @@ function closeApp(appId) {
 
 function minimizeApp(appId) {
     const win = document.getElementById(appId);
-    if (win) win.classList.add('minimized');
+    if (win) {
+        win.classList.add('minimized');
+        win.style.display = 'none';
+    }
 }
 
 // --- Multiple window system: bring to front on focus/click ---
@@ -389,6 +451,7 @@ function focusApp(appId) {
     const win = document.getElementById(appId);
     if (win) {
         win.classList.remove('minimized');
+        win.style.display = '';
         win.style.zIndex = maxZ + 1;
         win.classList.add('focused');
         document.querySelectorAll('.app_window').forEach(w => {
@@ -593,6 +656,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // setupAppLauncher(); // <-- remove this line
     setupAppScaling();
     setupWindowFocusOnClick();
+    // Redirect to login if not authenticated (client-side fallback)
+    fetch('/api/whoami', { credentials: 'include' })
+        .then(res => {
+            if (res.status === 401) {
+                window.location.href = '/login';
+            }
+        })
+        .catch(() => {
+            window.location.href = '/login';
+        });
 });
 
 // --- Simple Terminal App using Xterm.js and node-pty ---

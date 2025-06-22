@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OliveOS</title>
+
+    <link rel="stylesheet" href="/assets/css/index.css">
+    <link rel="stylesheet" href="/assets/css/login.css">
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+    <link rel="icon" href="/assets/image/fav/logo.svg" type="image/x-icon" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="/assets/image/fav/logo-d.svg" type="image/x-icon" media="(prefers-color-scheme: light)">
+
+    <meta name="theme-color" content="#ffffff">
+    <meta name="description" content="OliveOS - A modern web operating system experience.">
+    <meta name="keywords" content="OliveOS, Olive, OS, WebOS">
+    <meta name="author" content="JustNoone">
+</head>
+<body>
+    
+    <div class="background_container">
+        <img src="{{background_image_main}}" alt="background_img_main" id="background_img_main">
+    </div>
+
+    <div class="login_screen_b2" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;pointer-events:none;opacity:0;transition:opacity 0.3s;">
+        <form class="inner_container_top" id="login_screen_form" method="POST" action="/api/login"> 
+            <div class="inner_c_wr">
+            <h1 class="login_title">Add a new account</h1>
+            <p class="login_subtitle">Log in to your account</p>
+            <input type="text" name="email" id="login_email" class="login_input" placeholder="Email" autocomplete="email">
+            <input type="password" name="password" id="login_password" class="login_input" placeholder="Password" autocomplete="current-password">
+            <button class="login_button" id="login_button" type="submit">Log in</button>
+        </form>
+        </div>
+
+        <div class="inner_container">
+            <a>Change Accounts</a>
+            <div class="divider"></div>
+            <a>Make an account</a>
+        </div>
+    </div>
+
+    <div id="login_screen_m" class="login_screen_m" style="position:relative;z-index:1001;">
+        <div class="left_s">
+            <span id="date_currently" class="hb date">01.01.2025</span>
+            <span id="time_currently" class="hb time">12:34:56</span>
+        </div>
+        <div class="right_s">
+            <div id="user_info_section" style="display:none; flex-direction: row; align-items: flex-end; gap: 20px;">
+                <div class="login_rs">
+                    <img id="user_profile_img" src="" alt="pfp" class="login_logo">
+                </div>
+                <div class="login_d">
+                    <p class="logindata name" id="user_name_text"></p>
+                    <p class="logindata email" id="user_email_text"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./index.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script>
+        const loginScreen = document.getElementById('login_screen_m');
+        const loginScreenB2 = document.querySelector('.login_screen_b2');
+        // Ensure overlay starts hidden
+        if (loginScreenB2) loginScreenB2.style.opacity = 0;
+
+        let isDragging = false;
+        let isSnapped = false;
+        let startY;
+        let currentTranslateY = 0;
+        const topMargin = 50;
+        const maxDragDistance = loginScreen.offsetHeight + topMargin;
+        const releaseThreshold = maxDragDistance * 0.25;
+        const forceSnapThreshold = maxDragDistance * 0.50;
+        loginScreen.addEventListener('mousedown', dragStart);
+        loginScreen.addEventListener('touchstart', dragStart, { passive: false });
+        window.addEventListener('mousemove', dragging);
+        window.addEventListener('touchmove', dragging, { passive: false });
+        window.addEventListener('mouseup', dragEnd);
+        window.addEventListener('touchend', dragEnd);
+        // Slide up on any key press
+        window.addEventListener('keydown', function() {
+            if (!isSnapped) {
+                isSnapped = true;
+                loginScreen.style.transition = 'transform 0.4s ease-in-out, opacity 0.4s ease-in-out';
+                // Animate login_screen_m up
+                loginScreen.style.transform = `translateY(-${maxDragDistance}px)`;
+                loginScreen.style.opacity = 0;
+                // Fade in login_screen_b2
+                if (loginScreenB2) {
+                    loginScreenB2.style.transition = 'opacity 0.3s';
+                    loginScreenB2.style.opacity = 1;
+                }
+            }
+        });
+        function dragStart(e) {
+            startY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            isDragging = true;
+            isSnapped = false;
+            loginScreen.style.transition = 'none';
+        }
+        function dragging(e) {
+            if (!isDragging || isSnapped) return;
+            e.preventDefault();
+            const currentY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+            const deltaY = currentY - startY;
+            currentTranslateY = Math.min(0, Math.max(-maxDragDistance, deltaY));
+            const dragProgress = -currentTranslateY / maxDragDistance;
+            const newOpacity = 1 - dragProgress;
+            loginScreen.style.transform = `translateY(${currentTranslateY}px)`;
+            loginScreen.style.opacity = newOpacity;
+            // Fade in login_screen_b2 and control display/pointer-events
+            if (loginScreenB2) {
+                if (dragProgress >= 0.45) {
+                    loginScreenB2.style.display = 'block';
+                    loginScreenB2.style.pointerEvents = 'auto';
+                    loginScreenB2.style.transition = 'opacity 0.3s cubic-bezier(0.4,0,0.2,1)';
+                } else {
+                    loginScreenB2.style.display = 'none';
+                    loginScreenB2.style.pointerEvents = 'none';
+                    loginScreenB2.style.transition = 'none';
+                }
+                loginScreenB2.style.opacity = dragProgress;
+            }
+            if (-currentTranslateY >= forceSnapThreshold) {
+                isSnapped = true;
+                snapUp();
+            }
+        }
+        function dragEnd(e) {
+            if (!isDragging || isSnapped) return;
+            isDragging = false;
+            // Snap based on release position (25% threshold)
+            if (-currentTranslateY > releaseThreshold) {
+                snapUp();
+            } else {
+                snapDown();
+            }
+        }
+        function snapUp() {
+            loginScreen.style.transform = `translateY(-${maxDragDistance}px)`;
+            loginScreen.style.opacity = 0;
+            isDragging = false;
+            if (loginScreenB2) {
+                loginScreenB2.style.display = 'block';
+                loginScreenB2.style.pointerEvents = 'auto';
+                loginScreenB2.style.opacity = 1;
+                loginScreenB2.style.transition = 'opacity 0.3s cubic-bezier(0.4,0,0.2,1)';
+            }
+        }
+        function snapDown() {
+            loginScreen.style.transform = 'translateY(0px)';
+            loginScreen.style.opacity = 1;
+            if (loginScreenB2) {
+                loginScreenB2.style.display = 'none';
+                loginScreenB2.style.pointerEvents = 'none';
+                loginScreenB2.style.opacity = 0;
+                loginScreenB2.style.transition = 'none';
+            }
+        }
+        // Show user info only if registered flag is set in localStorage
+        document.addEventListener('DOMContentLoaded', function() {
+            if (localStorage.getItem('supabase_registered') === 'true') {
+                const userInfoSection = document.getElementById('user_info_section');
+                if (userInfoSection) userInfoSection.style.display = 'flex'; // Use flex to match layout
+            }
+        });
+    </script>
+    <script>
+    document.getElementById('login_screen_form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const email = document.getElementById('login_email').value;
+        const password = document.getElementById('login_password').value;
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        if (res.ok) {
+            // Expecting user info in response JSON
+            const data = await res.json();
+            if (data && data.user) {
+                localStorage.setItem('supabase_registered', 'true');
+                localStorage.setItem('user_profile', data.user.profile_url || '');
+                localStorage.setItem('user_name', data.user.name || '');
+                localStorage.setItem('user_email', data.user.email || email);
+            }
+            window.location.href = '/';
+        } else {
+            const data = await res.json();
+            console.error('Login failed:', data.error);
+            alert('Login failed: ' + data.error);
+        }
+    });
+    </script>
+    <script>
+    // Show login overlay always on reload
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginScreenB2 = document.querySelector('.login_screen_b2');
+        const userInfoSection = document.getElementById('user_info_section');
+        const loginEmail = document.getElementById('login_email');
+        // Always show login overlay
+        if (loginScreenB2) loginScreenB2.style.display = 'block';
+        // If user is stored, show user info and hide email box
+        if (localStorage.getItem('supabase_registered') === 'true') {
+            if (userInfoSection) userInfoSection.style.display = 'flex';
+            if (loginEmail) loginEmail.style.display = 'none';
+            // Populate user info from localStorage
+            const profile = localStorage.getItem('supabase_user_profile') || '/assets/image/default/pfp.png';
+            const name = localStorage.getItem('supabase_user_name') || '';
+            const email = localStorage.getItem('supabase_user_email') || '';
+            const profileImg = document.getElementById('user_profile_img');
+            const nameText = document.getElementById('user_name_text');
+            const emailText = document.getElementById('user_email_text');
+            if (profileImg) profileImg.src = profile;
+            if (nameText) nameText.textContent = name;
+            if (emailText) emailText.textContent = email;
+        } else {
+            if (userInfoSection) userInfoSection.style.display = 'none';
+            if (loginEmail) loginEmail.style.display = '';
+        }
+    });
+    </script>
+</body>
+</html>

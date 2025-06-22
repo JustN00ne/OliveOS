@@ -11,6 +11,7 @@ const fetch = require('node-fetch');
 const request = require('request');
 const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
+const cookieParser = require('cookie-parser');
 
 // --- Supabase Client Setup ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -44,6 +45,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/data/applicaton', express.static(path.join(__dirname, 'data', 'applicaton')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(cookieParser());
 
 // Log all requests
 app.use((req, res, next) => {
@@ -51,10 +53,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// --- Home Route ---
-app.get('/', (req, res) => {
-  console.log('[Route] GET /');
-  res.render('index', { ...globalData });
+// --- Auth Router ---
+const { router: authRouter, requireSupabaseAuth } = require('./api/auth');
+app.use('/api', authRouter);
+
+// --- Home Route (Protected) ---
+app.get('/', requireSupabaseAuth, (req, res) => {
+  res.render('index', { ...globalData, user: req.supabaseUser });
+});
+
+// --- Login Route (Public) ---
+app.get('/login', (req, res) => {
+  res.render('login', { ...globalData });
 });
 
 // --- Proxy Endpoint for Iframe Embedding (improved version) ---

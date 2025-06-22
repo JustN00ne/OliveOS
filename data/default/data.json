@@ -1,10 +1,11 @@
 {
 
-
   "background_image_main": "/assets/image/default/bg.jpg",
   "dynamic_applogo_uuid": "https://raw.githubusercontent.com/feathericons/feather/3dc050d97405062eba78aa57115c0a15c63abdaa/icons/globe.svg",
-  "dynamic_appname_uuid": "Browser",
-  "dynamic_title_uuid": "Endless Horse",
 
-  "notif_count": "5+"
+  "notif_count": "5+",
+
+  "user_profile": "https://cdn.discordapp.com/avatars/977851845361938452/747a668deb0ce134eab7513614464772?size=1024",
+  "user_name": "John Doe",
+  "user_email": "john.doe@example.com"
 }
