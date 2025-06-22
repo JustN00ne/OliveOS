@@ -653,6 +653,10 @@ if (window.location.pathname.includes('terminal.html')) {
                 term.writeln('logout');
                 setTimeout(() => window.close(), 500);
                 break;
+            case 'olive':
+                term.writeln(
+`.:^~~~!!!~~~^:.            olive@oliveos\n       :^!!!!!!!!!~^^:::^^^:         --------------------------\n    .^!!!!!!!!!!^.         .:^.      OS:      Win32\n   ^!!!!!!!!!!~.             .~:     Host:    localhost\n  ~!!!!!!!!!!~                 ~^    Kernel:  Mozilla/5.0 (Windows NT 1...\n ~!!!!!!!!~~!^                 ^~^   Uptime:  0s\n^!!!!!!!~~~~~~                 ^~~:  Packages: 42 (npm)\n!!!!!!~~~~~~~~^               ^~^^^  Shell:   simulated\n~!!~~~~~~~~~~~~~:           .^~^^^^  Resolution: 1536x864\n^!~~~~~~~~~~~~~~~~^:.....:^~~^^^^^:  DE:      OliveOS Desktop Environment\n ~!~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^   WM:      Olivindo 1.0\n  ~!~~~~~~~~~~~~~~~~~~^^^^^^^^^^^    WM Theme: Default Theme - Dark\n   ^~~~~~~~~~~~~~~~~~^^^^^^^^^^:     Terminal: OliveOS Terminal / UNIX like\n    .^~~~~~~~~~~~~^^^^^^^^^^^:       Terminal Font: Monospace\n       .^~~~~~~~~^^^^^^^^^:.         CPU:     N/A\n          ..:^^^^^^^^::.             GPU:     N/A\n                                     Memory:  N/A\n                                     Network: N/A\n\n                `);
+                break;
             default:
                 if (command.trim() !== '')
                     term.writeln(`${command}: command not found`);
