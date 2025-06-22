@@ -295,7 +295,8 @@
                             "                                   "
                         ];
                         // Gather dynamic info
-                        const hostname = window.location.hostname || 'temporary@user.com';
+                        let hostname = window.location.hostname || 'temporary@user.com';
+                        if (hostname.length > 28) hostname = hostname.slice(0, 25) + '...';
                         const os = navigator.platform || 'OliveOS Web';
                         // Kernel short (max 28 chars, add ... if longer)
                         let kernelRaw = navigator.userAgent;
