@@ -1,0 +1,6 @@
+.app_invisible {
+    display: none !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    opacity: 0 !important;
+}

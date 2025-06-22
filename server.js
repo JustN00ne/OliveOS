@@ -1,6 +1,8 @@
 // server.js
 require('dotenv').config(); // Load .env for Supabase keys
 const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
 const path = require('path');
 const exphbs = require('express-handlebars');
 const fs = require('fs-extra');
@@ -14,18 +16,22 @@ const iconv = require('iconv-lite');
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-console.log('Connected to Supabase.');
+console.log('{log} Connected to Supabase.');
 
-// You can now use `supabase` for DB operations (auth, storage, etc.)
-// Example: supabase.from('table').select('*')
+// Log environment variables for debugging
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Log server start
+console.log(`[Server] Starting on port ${PORT}`);
 
 let globalData = {};
 const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
 try {
   globalData = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
+  console.log('[Server] Loaded global data from', globalDataPath);
 } catch (err) {
   console.warn('Warning: Failed to load global data for Handlebars template:', err.message);
 }
@@ -35,21 +41,30 @@ app.set('views', path.join(__dirname, 'public'));
 
 // --- Static File Serving ---
 app.use(express.static(path.join(__dirname, 'public')));
-// Serve app manifests and sources from /data/applicaton
 app.use('/data/applicaton', express.static(path.join(__dirname, 'data', 'applicaton')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Log all requests
+app.use((req, res, next) => {
+  console.log(`[Request] ${req.method} ${req.url}`);
+  next();
+});
+
 // --- Home Route ---
 app.get('/', (req, res) => {
+  console.log('[Route] GET /');
   res.render('index', { ...globalData });
 });
 
 // --- Proxy Endpoint for Iframe Embedding (improved version) ---
 app.all('/proxy', (req, res) => {
   const targetUrl = req.method === 'POST' ? req.body.url : req.query.url;
-  if (!targetUrl) return res.status(400).send('Missing ?url');
-
+  if (!targetUrl) {
+    console.error('[Proxy] Missing ?url');
+    return res.status(400).send('Missing ?url');
+  }
+  console.log(`[Proxy] Proxying request to: ${targetUrl}`);
   request({
     url: targetUrl,
     headers: {
@@ -57,7 +72,10 @@ app.all('/proxy', (req, res) => {
     },
     encoding: null,
   }, (err, response, body) => {
-    if (err || !response) return res.status(500).send('Request failed');
+    if (err || !response) {
+      console.error('[Proxy] Request failed:', err);
+      return res.status(500).send('Request failed');
+    }
     const contentType = response.headers['content-type'] || '';
     res.removeHeader('Content-Security-Policy');
     res.removeHeader('X-Frame-Options');
@@ -279,6 +297,7 @@ app.all('/proxy', (req, res) => {
       `;
       $('script:first').before(`<script>${injectionScript}</script>`);
       res.setHeader('Content-Type', 'text/html');
+      console.log('[Proxy] HTML content proxied.');
       return res.send($.html());
     }
     res.setHeader('Content-Type', contentType);
@@ -335,6 +354,7 @@ app.post('/api/filesystem/create/*', async (req, res) => {
   const operationId = 'op_' + Date.now() + Math.random().toString(36).substr(2, 6);
   try {
     if (!type || (type !== 'file' && type !== 'folder')) {
+      console.error(`[${operationId}] Invalid type specified:`, type);
       throw new Error('Invalid type specified. Must be "file" or "folder"');
     }
     // In a real app, you'd create the file/folder in Supabase Storage here
@@ -393,16 +413,49 @@ app.post('/api/filesystem/delete/*', async (req, res) => {
   }
 });
 
-
 app.get('/list-apps', (req, res) => {
+  const showAll = req.query.all === 'true';
   const appsDir = path.join(__dirname, 'data', 'applicaton');
-  fs.readdir(appsDir, { withFileTypes: true }, (err, files) => {
-    if (err) return res.status(500).json([]);
-    // Only include folders that contain @manifest.oman
-    const folders = files.filter(f => f.isDirectory()).map(f => f.name).filter(folder => {
+  fs.readdir(appsDir, { withFileTypes: true }, async (err, files) => {
+    if (err) {
+      console.error('[list-apps] Failed to read apps directory:', err);
+      return res.status(500).json([]);
+    }
+    const folders = [];
+    for (const f of files) {
+      if (!f.isDirectory()) continue;
+      const folder = f.name;
       const manifestPath = path.join(appsDir, folder, '@manifest.oman');
-      return fs.existsSync(manifestPath);
-    });
+      if (!fs.existsSync(manifestPath)) continue;
+      try {
+        const manifestText = fs.readFileSync(manifestPath, 'utf-8');
+        let invisible = false;
+        const lines = manifestText.split(/\r?\n/);
+        let section = null;
+        for (let line of lines) {
+          line = line.trim();
+          if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+          if (line.startsWith('@#[')) {
+            section = line.match(/@#\[(.+?)\]/)?.[1]?.toLowerCase() || null;
+            continue;
+          }
+          if (section === 'ui' && line.toLowerCase().startsWith('invisible')) {
+            let [k, v] = line.split('=').map(s => s.trim());
+            if (k.toLowerCase() === 'invisible') {
+              v = v.replace(/['\"]/g, '').toLowerCase();
+              if (v === 'true' || v === '1') {
+                invisible = true;
+                break;
+              }
+            }
+          }
+        }
+        if (!invisible || showAll) folders.push(folder);
+      } catch (e) {
+        folders.push(folder); // fallback: show if error
+      }
+    }
+    console.log(`[list-apps] Found app folders:`, folders);
     res.json(folders);
   });
 });
@@ -412,12 +465,10 @@ if (process.env.NODE_ENV !== 'production') {
   console.log('Nodemon is watching for changes...');
 }
 
-// Start the server if not running in a serverless/Vercel environment
-if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`Express server listening on http://localhost:${PORT}`);
-  });
-}
+// Start the server
+server.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
 
 console.log("Server is running in https://localhost:" + PORT);
 module.exports = app;

@@ -136,6 +136,7 @@ body{
     left: 0;
     object-fit: cover;
     z-index: -1; /* Ensure background is behind other content */
+    user-select: none;
 }
 
 .tooltip{
@@ -150,4 +151,17 @@ body{
   transition: transform 0.3s var(--easing-main), opacity 0.3s var(--easing-main), opacity 0.3s var(--easing-main);
   backdrop-filter: blur(10px);
   border: 1px solid #ffffff22;
+}
+
+.xterm-screen {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  box-sizing: border-box;
+}
+
+.xterm .terminal{
+  height: 100%;
+  width: 100%;
 }

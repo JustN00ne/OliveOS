@@ -1,0 +1,4 @@
+@#[sources]
+main = index.html
+js = index.js
+css = index.css

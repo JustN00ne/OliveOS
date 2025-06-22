@@ -1,0 +1,16 @@
+@#[app]
+id = "nano.ox"
+name = "Nano Editor"
+icon = "/source/assets/icon.png"
+
+
+@#[runtime]
+working_directory = "/source/app/"
+
+@#[ui]
+width = "700"
+height = "400"
+resizable = "true"
+fullscreen = "false"
+type = "windowed"
+invisible = "true"

@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OliveOS Terminal</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
+  <style>
+    html, body { height: 100%; margin: 0; background: #181818; overflow: hidden; scrollbar-width: none; -ms-overflow-style: none; }
+    html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; }
+    #terminal {
+      width: 100vw;
+      height: 100vh;
+      box-sizing: border-box;
+      padding: 2px 12px;
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+    #terminal::-webkit-scrollbar {
+      display: none; /* Chrome/Safari/Opera */
+    }
+    .xterm .xterm-rows { word-break: break-all; }
+    .xterm .xterm-cursor { z-index: 10; }
+    /* Prompt and output styling */
+    .xterm .oliveos-prompt { color: #6cf; font-weight: bold; }
+    .xterm .oliveos-output { color: #e0e0e0; }
+    .xterm .oliveos-error { color: #ff5c57; }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+  <script src="deviceinfo.js"></script>
+  <script>
+    // Inline terminal logic for OliveOS Terminal app
+    window.addEventListener('DOMContentLoaded', function() {
+      const term = new window.Terminal({
+        cursorBlink: true,
+        fontFamily: 'monospace',
+        fontSize: 16,
+        theme: { background: '#181818', foreground: '#e0e0e0' }
+      });
+      term.open(document.getElementById('terminal'));
+      term.focus();
+      let cwd = '/';
+      let prompt = () => `\x1b[36molive@oliveos:${cwd}$\x1b[0m `;
+      let buffer = '';
+      let promptLength = 0;
+      let fs = {
+        '/': {
+          type: 'dir',
+          name: '/',
+          parent: null,
+          children: {
+            'Desktop': { type: 'dir', name: 'Desktop', parent: '/', children: {} },
+            'Documents': { type: 'dir', name: 'Documents', parent: '/', children: {} },
+            'Downloads': { type: 'dir', name: 'Downloads', parent: '/', children: {} },
+            'Music': { type: 'dir', name: 'Music', parent: '/', children: {} },
+            'Pictures': { type: 'dir', name: 'Pictures', parent: '/', children: {} },
+            'Videos': { type: 'dir', name: 'Videos', parent: '/', children: {} },
+          }
+        }
+      };
+      let fsCwd = ['/'];
+      function getNode(pathArr) {
+        let node = fs['/'];
+        for (let i = 1; i < pathArr.length; i++) {
+          if (!node.children[pathArr[i]]) return null;
+          node = node.children[pathArr[i]];
+        }
+        return node;
+      }
+      function resolvePath(p) {
+        if (!p) return fsCwd.slice();
+        let arr = p.startsWith('/') ? ['/'] : fsCwd.slice();
+        for (let part of p.split('/')) {
+          if (!part || part === '.') continue;
+          if (part === '..') { if (arr.length > 1) arr.pop(); }
+          else arr.push(part);
+        }
+        return arr;
+      }
+      function listDir(node) {
+        return Object.keys(node.children).sort();
+      }
+      function pathStr(arr) {
+        return arr.length === 1 ? '/' : arr.join('/').replace(/\\/g, '/');
+      }
+      function isDir(node) { return node && node.type === 'dir'; }
+      function isFile(node) { return node && node.type === 'file'; }
+      function makeDir(parent, name) {
+        if (parent.children[name]) return false;
+        parent.children[name] = { type: 'dir', name, parent, children: {} };
+        return true;
+      }
+      function makeFile(parent, name, content = '') {
+        if (parent.children[name]) return false;
+        parent.children[name] = { type: 'file', name, parent, content, mtime: Date.now() };
+        return true;
+      }
+      function removeNode(parent, name) {
+        delete parent.children[name];
+      }
+      function getParentAndName(pathArr) {
+        let parent = getNode(pathArr.slice(0, -1));
+        let name = pathArr[pathArr.length - 1];
+        return [parent, name];
+      }
+      function printPrompt() {
+        try {
+            term.write('\r\n' + prompt());
+            console.log('[Terminal] Prompt displayed:', prompt());
+        } catch (err) {
+            console.error('[Terminal] Error printing prompt:', err);
+        }
+      }
+      let nanoActive = false;
+      let nanoListener = null;
+      function runCommand(cmd = '') {
+        try {
+            if (nanoActive) return; // Prevent running commands while in nano
+            const args = cmd.trim().split(/\s+/);
+            const command = args[0];
+            let output = '';
+            console.log('[Terminal] Command received:', cmd);
+            switch (command) {
+                case 'help':
+                    output = '\r\n' + (
+                        'Available commands:' +
+                        '\r\n  help     Show this help message' +
+                        '\r\n  clear    Clear the terminal' +
+                        '\r\n  echo     Print text to the terminal or file' +
+                        '\r\n  ls       List files/folders' +
+                        '\r\n  cd       Change directory' +
+                        '\r\n  pwd      Print working directory' +
+                        '\r\n  mkdir    Create directory' +
+                        '\r\n  rmdir    Remove empty directory' +
+                        '\r\n  touch    Create empty file' +
+                        '\r\n  nano     Edit file' +
+                        '\r\n  cat      View file' +
+                        '\r\n  cp       Copy file or directory' +
+                        '\r\n  mv       Move/rename file or directory' +
+                        '\r\n  rm       Remove file or directory' +
+                        '\r\n  stat     File or directory info' +
+                        '\r\n  file     File type info' +
+                        '\r\n  wc       Count lines/words/chars' +
+                        '\r\n  find     Find files' +
+                        '\r\n  locate   Locate files' +
+                        '\r\n  realpath Show absolute path' +
+                        '\r\n  tar      Archive files (simulated)' +
+                        '\r\n  zip      Zip files (simulated)' +
+                        '\r\n  unzip    Unzip files (simulated)' +
+                        '\r\n  grep     Search file content' +
+                        '\r\n  head     Show start of file' +
+                        '\r\n  tail     Show end of file' +
+                        '\r\n  cut      Extract columns' +
+                        '\r\n  awk      Pattern scan (simulated)' +
+                        '\r\n  sed      Stream edit (simulated)' +
+                        '\r\n  lsattr   List file attributes' +
+                        '\r\n  chattr   Change file attributes' +
+                        '\r\n  tmpwatch Clean up temp files' +
+                        '\r\n  tree     Visual directory tree' +
+                        '\r\n  vim/vi/emacs/du/df/chmod/chown/chgrp/mount/umount/lsblk/blkid/fsck: Not implemented' +
+                        '\r\n  date     Show current date/time' +
+                        '\r\n  whoami   Show current user' +
+                        '\r\n  about    About OliveOS Terminal' +
+                        '\r\n  exit     Close the terminal' +
+                        '\r\n  olive    OliveOS information (NeoFetch like)'
+                    );
+                    break;
+                case 'clear':
+                    term.clear();
+                    printPrompt();
+                    console.log('[Terminal] Screen cleared');
+                    return;
+                case 'echo': {
+                    let redirectIdx = args.indexOf('>');
+                    if (redirectIdx > 0 && args[redirectIdx+1]) {
+                        let text = args.slice(1, redirectIdx).join(' ');
+                        let path = args[redirectIdx+1];
+                        let arr = resolvePath(path);
+                        let [parent, name] = getParentAndName(arr);
+                        if (!parent || !isDir(parent)) {
+                            output = `\r\necho: cannot create file '${path}': No such directory`;
+                        } else {
+                            if (!parent.children[name]) makeFile(parent, name, text + '\n');
+                            else if (isFile(parent.children[name])) parent.children[name].content = text + '\n';
+                            output = '';
+                        }
+                    } else {
+                        let prefix = '';
+                        let suffix = '';
+                        let filtered = [];
+                        for (let i = 1; i < args.length; i++) {
+                            if (args[i] === '--prefix' && args[i+1]) {
+                                prefix = args[i+1];
+                                i++;
+                            } else if (args[i] === '--suffix' && args[i+1]) {
+                                suffix = args[i+1];
+                                i++;
+                            } else {
+                                filtered.push(args[i]);
+                            }
+                        }
+                        output = '\r\n' + prefix + filtered.join(' ') + suffix;
+                    }
+                    break;
+                }
+                case 'ls': {
+                    let path = args[1] || '.';
+                    let node = getNode(resolvePath(path));
+                    if (!node || !isDir(node)) {
+                        output = `\r\nls: cannot access '${path}': No such directory`;
+                        break;
+                    }
+                    let files = listDir(node);
+                    output = '\r\n' + files.join('  ');
+                    break;
+                }
+                case 'cd': {
+                    let path = args[1];
+                    if (!path) break;
+                    let arr = resolvePath(path);
+                    let node = getNode(arr);
+                    if (node && isDir(node)) {
+                        fsCwd = arr;
+                        cwd = pathStr(fsCwd);
+                        output = '';
+                    } else {
+                        output = `\r\ncd: ${path}: No such directory`;
+                    }
+                    break;
+                }
+                case 'pwd':
+                    output = '\r\n' + pathStr(fsCwd);
+                    break;
+                case 'date':
+                    output = '\r\n' + new Date().toString();
+                    break;
+                case 'whoami':
+                    output = '\r\nolive';
+                    break;
+                case 'about':
+                    output = '\r\n' + (
+                        '\x1b[1mOliveOS Terminal\x1b[0m  ' +
+                        '\x1b[48;5;106m\x1b[30m v1.0 \x1b[0m' +
+                        '\r\n\x1b[38;5;240m┌' + '─'.repeat(34) + '┐\x1b[0m' +
+                        '\r\n\x1b[38;5;240m│\x1b[0m  A simulated shell for OliveOS.      \x1b[38;5;240m│\x1b[0m' +
+                        '\r\n\x1b[38;5;240m│\x1b[0m  Built with \x1b[38;5;39mXterm.js\x1b[0m and JavaScript. \x1b[38;5;240m│\x1b[0m' +
+                        '\r\n\x1b[38;5;240m│\x1b[0m  (c) 2025 OliveOS Project           \x1b[38;5;240m│\x1b[0m' +
+                        '\r\n\x1b[38;5;240m└' + '─'.repeat(34) + '┘\x1b[0m'
+                    );
+                    break;
+                case 'exit':
+                    output = '\r\nlogout';
+                    term.write(output);
+                    setTimeout(() => {
+                        try {
+                            window.open('', '_self', '');
+                            window.close();
+                            setTimeout(() => {
+                                if (!window.closed) {
+                                    term.write('\r\n[!] Unable to close window automatically. Please close this tab or window manually.');
+                                    console.warn('[Terminal] Unable to close window automatically.');
+                                } else {
+                                    console.log('[Terminal] Window closed successfully.');
+                                }
+                            }, 400);
+                        } catch (err) {
+                            console.error('[Terminal] Error closing window:', err);
+                            term.write('\r\n[!] Error closing window.');
+                        }
+                    }, 500);
+                    return;
+                case 'olive': {
+                    try {
+                        // OliveOS logo ASCII (16 lines, left column)
+                        const logo = [
+                            "          .:^~~~!!!~~~^:.          ",
+                            "       :^!!!!!!!!!~^^:::^^^:       ",
+                            "    .^!!!!!!!!!!^.         .:^.    ",
+                            "   ^!!!!!!!!!!~.             .~:   ",
+                            "  ~!!!!!!!!!!~                 ~^  ",
+                            " ~!!!!!!!!~~!^                 ^~^ ",
+                            "^!!!!!!!~~~~~~                 ^~~:",
+                            "!!!!!!~~~~~~~~^               ^~^^^",
+                            "~!!~~~~~~~~~~~~~:           .^~^^^^",
+                            "^!~~~~~~~~~~~~~~~~^:.....:^~~^^^^^:",
+                            " ~!~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^ ",
+                            "  ~!~~~~~~~~~~~~~~~~~~^^^^^^^^^^^  ",
+                            "   ^~~~~~~~~~~~~~~~~~^^^^^^^^^^:   ",
+                            "    .^~~~~~~~~~~~~^^^^^^^^^^^:     ",
+                            "       .^~~~~~~~~^^^^^^^^^:.       ",
+                            "          ..:^^^^^^^^::.           ",
+                            "                                   ",
+                            "                                   "
+                        ];
+                        // Gather dynamic info
+                        const hostname = window.location.hostname || 'temporary@user.com';
+                        const os = navigator.platform || 'OliveOS Web';
+                        // Kernel short (max 28 chars, add ... if longer)
+                        let kernelRaw = navigator.userAgent;
+                        let kernelShort = kernelRaw.length > 28 ? kernelRaw.slice(0, 25) + '...' : kernelRaw;
+                        const resolution = `${window.screen.width}x${window.screen.height}`;
+                        const de = 'OliveOS Desktop Environment';
+                        const wm = 'Olivindo 1.0';
+                        const wmTheme = 'Default Theme - Dark';
+                        const termName = 'OliveOS Terminal / UNIX like';
+                        const termFont = 'Monospace';
+                        // --- Device Info ---
+                        let cpu = 'N/A', gpu = 'N/A', mem = 'N/A', net = 'N/A';
+                        if (window.getDeviceInfo) {
+                            const info = window.getDeviceInfo();
+                            if (info.cpu && info.cpu.cores) cpu = `${info.cpu.cores} cores`;
+                            if (info.gpu && info.gpu.model) gpu = `${info.gpu.vendor || ''} ${info.gpu.model}`.trim();
+                            if (info.mem && info.mem.kb) {
+                                const gb = info.mem.kb / (1024 ** 3);
+                                mem = `${gb.toFixed(1)} GiB`;
+                            }
+                            if (info.net && info.net.effectiveType) {
+                                net = `${info.net.effectiveType} (${info.net.downlink || 0} Mbps)`;
+                            }
+                        }
+                        // Uptime since page load
+                        if (!window._oliveos_boot) window._oliveos_boot = Date.now();
+                        const uptimeMs = Date.now() - window._oliveos_boot;
+                        function formatUptime(ms) {
+                            const s = Math.floor(ms / 1000);
+                            const m = Math.floor(s / 60);
+                            const h = Math.floor(m / 60);
+                            const d = Math.floor(h / 24);
+                            if (d > 0) return `${d}d ${h%24}h ${m%60}m`;
+                            if (h > 0) return `${h}h ${m%60}m ${s%60}s`;
+                            if (m > 0) return `${m}m ${s%60}s`;
+                            return `${s}s`;
+                        }
+                        // Info block (right column, 16 lines)
+                        const info = [
+                            `\x1b[1;32molive@oliveos\x1b[0m`,
+                            `--------------------------`,
+                            `\x1b[1;33mOS\x1b[0m:      ${os}`,
+                            `\x1b[1;33mHost\x1b[0m:    ${hostname}`,
+                            `\x1b[1;33mKernel\x1b[0m:  ${kernelShort}`,
+                            `\x1b[1;33mUptime\x1b[0m:  ${formatUptime(uptimeMs)}`,
+                            `\x1b[1;33mPackages\x1b[0m: 42 (npm)`,
+                            `\x1b[1;33mShell\x1b[0m:   simulated`,
+                            `\x1b[1;33mResolution\x1b[0m: ${resolution}`,
+                            `\x1b[1;33mDE\x1b[0m:      ${de}`,
+                            `\x1b[1;33mWM\x1b[0m:      ${wm}`,
+                            `\x1b[1;33mWM Theme\x1b[0m: ${wmTheme}`,
+                            `\x1b[1;33mTerminal\x1b[0m: ${termName}`,
+                            `\x1b[1;33mTerminal Font\x1b[0m: ${termFont}`,
+                            `\x1b[1;33mCPU\x1b[0m:     ${cpu}`,
+                            `\x1b[1;33mGPU\x1b[0m:     ${gpu}`,
+                            `\x1b[1;33mMemory\x1b[0m:  ${mem}`,
+                            `\x1b[1;33mNetwork\x1b[0m: ${net}`
+                        ];
+                        // Pad logo and info to same length
+                        while (logo.length < info.length) logo.push('                    ');
+                        while (info.length < logo.length) info.push('');
+                        output = '\r\n';
+                        for (let i = 0; i < logo.length; i++) {
+                            output += `\x1b[38;5;82m${logo[i]}\x1b[0m  ${info[i]}\r\n`;
+                        }
+                        // Color bar
+                        output += '\r\n';
+                        [196, 202, 226, 46, 21, 93, 201, 250].forEach(c => {
+                            output += `\x1b[48;5;${c}m  \x1b[0m`;
+                        });
+                        output += '\r\n';
+                        console.log('[Terminal] OliveOS info displayed.');
+                    } catch (err) {
+                        output = '\r\n[!] Error displaying OliveOS info.';
+                        console.error('[Terminal] Error in olive command:', err);
+                    }
+                    break;
+                }
+                case 'mkdir': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nmkdir: missing operand'; break; }
+                    let arr = resolvePath(path);
+                    let [parent, name] = getParentAndName(arr);
+                    if (!parent || !isDir(parent)) {
+                        output = `\r\nmkdir: cannot create directory '${path}': No such file or directory`;
+                    } else if (parent.children[name]) {
+                        output = `\r\nmkdir: cannot create directory '${path}': File exists`;
+                    } else {
+                        makeDir(parent, name);
+                        output = '';
+                    }
+                    break;
+                }
+                case 'rmdir': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nrmdir: missing operand'; break; }
+                    let arr = resolvePath(path);
+                    let [parent, name] = getParentAndName(arr);
+                    let node = parent && parent.children[name];
+                    if (!node || !isDir(node)) {
+                        output = `\r\nrmdir: failed to remove '${path}': No such directory`;
+                    } else if (Object.keys(node.children).length > 0) {
+                        output = `\r\nrmdir: failed to remove '${path}': Directory not empty`;
+                    } else {
+                        removeNode(parent, name);
+                        output = '';
+                    }
+                    break;
+                }
+                case 'touch': {
+                    let path = args[1];
+                    if (!path) { output = '\r\ntouch: missing file operand'; break; }
+                    let arr = resolvePath(path);
+                    let [parent, name] = getParentAndName(arr);
+                    if (!parent || !isDir(parent)) {
+                        output = `\r\ntouch: cannot touch '${path}': No such directory`;
+                    } else if (parent.children[name]) {
+                        if (isFile(parent.children[name])) parent.children[name].mtime = Date.now();
+                        output = '';
+                    } else {
+                        makeFile(parent, name);
+                        output = '';
+                    }
+                    break;
+                }
+                case 'cat': {
+                    let path = args[1];
+                    if (!path) { output = '\r\ncat: missing file operand'; break; }
+                    let node = getNode(resolvePath(path));
+                    if (!node || !isFile(node)) {
+                        output = `\r\ncat: ${path}: No such file`;
+                    } else {
+                        output = '\r\n' + node.content;
+                    }
+                    break;
+                }
+                case 'nano': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nnano: missing file operand'; break; }
+                    let arr = resolvePath(path);
+                    let [parent, name] = getParentAndName(arr);
+                    let node = parent && parent.children[name];
+                    if (!node) {
+                        makeFile(parent, name, '');
+                        node = parent.children[name];
+                    }
+                    if (!isFile(node)) {
+                        output = '\r\nnano: ' + path + ': Not a file';
+                        break;
+                    }
+                    setNanoFileLocalStorage(pathStr(arr), node.content);
+                    if (window.parent && window.parent.openApp) {
+                        // Listen for window focus to check for localStorage update
+                        let lastNanoCheck = Date.now();
+                        let nanoCheckInterval = setInterval(() => {
+                          if (document.hasFocus() && Date.now() - lastNanoCheck > 500) {
+                            // Sync from localStorage
+                            let file = localStorage.getItem('nano_file_path');
+                            let content = localStorage.getItem('nano_file_content');
+                            if (file && typeof content === 'string') {
+                              let arr = resolvePath(file);
+                              let node = getNode(arr);
+                              if (node && isFile(node)) {
+                                node.content = content;
+                                node.mtime = Date.now();
+                              }
+                            }
+                            clearInterval(nanoCheckInterval);
+                          }
+                        }, 500);
+                        window.parent.openApp('nano.ox', { file: pathStr(arr) });
+                        output = '\r\n[nano] Opened nano editor in a new OliveOS window.';
+                        break;
+                    }
+                    output = '\r\n[nano] OliveOS window system not available.';
+                    break;
+                }
+                case 'cp': {
+                    let src = args[1], dest = args[2];
+                    if (!src || !dest) { output = '\r\ncp: missing file operand'; break; }
+                    let srcNode = getNode(resolvePath(src));
+                    let destArr = resolvePath(dest);
+                    let [destParent, destName] = getParentAndName(destArr);
+                    if (!srcNode || !destParent || !isDir(destParent)) {
+                        output = `\r\ncp: cannot copy '${src}' to '${dest}': No such file or directory`;
+                    } else if (isFile(srcNode)) {
+                        makeFile(destParent, destName, srcNode.content);
+                        output = '';
+                    } else if (isDir(srcNode)) {
+                        function copyDir(src, dest) {
+                            makeDir(dest, src.name);
+                            let newDir = dest.children[src.name];
+                            for (let k in src.children) {
+                                if (isFile(src.children[k])) makeFile(newDir, k, src.children[k].content);
+                                else if (isDir(src.children[k])) copyDir(src.children[k], newDir);
+                            }
+                        }
+                        copyDir(srcNode, destParent);
+                        output = '';
+                    }
+                    break;
+                }
+                case 'mv': {
+                    let src = args[1], dest = args[2];
+                    if (!src || !dest) { output = '\r\nmv: missing file operand'; break; }
+                    let srcArr = resolvePath(src);
+                    let [srcParent, srcName] = getParentAndName(srcArr);
+                    let srcNode = srcParent && srcParent.children[srcName];
+                    let destArr = resolvePath(dest);
+                    let [destParent, destName] = getParentAndName(destArr);
+                    if (!srcNode || !srcParent || !destParent || !isDir(destParent)) {
+                        output = `\r\nmv: cannot move '${src}' to '${dest}': No such file or directory`;
+                    } else {
+                        destParent.children[destName] = srcNode;
+                        removeNode(srcParent, srcName);
+                        output = '';
+                    }
+                    break;
+                }
+                case 'rm': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nrm: missing operand'; break; }
+                    let arr = resolvePath(path);
+                    let [parent, name] = getParentAndName(arr);
+                    let node = parent && parent.children[name];
+                    if (!node) {
+                        output = `\r\nrm: cannot remove '${path}': No such file or directory`;
+                    } else if (isDir(node) && Object.keys(node.children).length > 0) {
+                        output = `\r\nrm: cannot remove '${path}': Directory not empty`;
+                    } else {
+                        removeNode(parent, name);
+                        output = '';
+                    }
+                    break;
+                }
+                case 'stat': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nstat: missing operand'; break; }
+                    let node = getNode(resolvePath(path));
+                    if (!node) {
+                        output = `\r\nstat: cannot stat '${path}': No such file or directory`;
+                    } else if (isFile(node)) {
+                        output = `\r\n  File: ${path}\n  Size: ${node.content.length} bytes\n  Modified: ${new Date(node.mtime).toLocaleString()}`;
+                    } else if (isDir(node)) {
+                        output = `\r\n  Directory: ${path}\n  Contains: ${Object.keys(node.children).length} items`;
+                    }
+                    break;
+                }
+                case 'file': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nfile: missing operand'; break; }
+                    let node = getNode(resolvePath(path));
+                    if (!node) {
+                        output = `\r\nfile: cannot stat '${path}': No such file or directory`;
+                    } else if (isFile(node)) {
+                        output = `\r\n${path}: ASCII text`;
+                    } else if (isDir(node)) {
+                        output = `\r\n${path}: directory`;
+                    }
+                    break;
+                }
+                case 'wc': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nwc: missing file operand'; break; }
+                    let node = getNode(resolvePath(path));
+                    if (!node || !isFile(node)) {
+                        output = `\r\nwc: ${path}: No such file`;
+                    } else {
+                        let lines = node.content.split(/\r?\n/).length - 1;
+                        let words = node.content.trim().split(/\s+/).filter(Boolean).length;
+                        let bytes = node.content.length;
+                        output = `\r\n  ${lines} ${words} ${bytes} ${path}`;
+                    }
+                    break;
+                }
+                case 'find': {
+                    let results = [];
+                    function walk(node, path) {
+                        if (isFile(node)) results.push(path);
+                        if (isDir(node)) {
+                            for (let k in node.children) walk(node.children[k], path + (path === '/' ? '' : '/') + k);
+                        }
+                    }
+                    let start = args[1] ? resolvePath(args[1]) : fsCwd;
+                    let node = getNode(start);
+                    if (!node) { output = '\r\nfind: path not found'; break; }
+                    walk(node, pathStr(start));
+                    output = '\r\n' + results.join('\r\n');
+                    break;
+                }
+                case 'locate': {
+                    let name = args[1];
+                    if (!name) { output = '\r\nlocate: missing pattern'; break; }
+                    let results = [];
+                    function walk(node, path) {
+                        if (isFile(node) && node.name.includes(name)) results.push(path);
+                        if (isDir(node)) {
+                            for (let k in node.children) walk(node.children[k], path + (path === '/' ? '' : '/') + k);
+                        }
+                    }
+                    walk(fs['/'], '/');
+                    output = '\r\n' + results.join('\r\n');
+                    break;
+                }
+                case 'realpath': {
+                    let path = args[1];
+                    if (!path) { output = '\r\nrealpath: missing operand'; break; }
+                    let arr = resolvePath(path);
+                    let node = getNode(arr);
+                    if (!node) {
+                        output = `\r\nrealpath: ${path}: No such file or directory`;
+                    } else {
+                        output = '\r\n' + pathStr(arr);
+                    }
+                    break;
+                }
+                case 'tree': {
+                    function draw(node, prefix = '', isLast = true) {
+                        let out = prefix + (prefix ? (isLast ? '└── ' : '├── ') : '') + node.name + '\r\n';
+                        if (isDir(node)) {
+                            let keys = Object.keys(node.children);
+                            keys.forEach((k, i) => {
+                                out += draw(node.children[k], prefix + (prefix ? (isLast ? '    ' : '│   ') : ''), i === keys.length - 1);
+                            });
+                        }
+                        return out;
+                    }
+                    let node = getNode(fsCwd);
+                    output = '\r\n' + draw(node, '', true);
+                    break;
+                }
+                case 'tar':
+                case 'zip':
+                case 'unzip':
+                case 'awk':
+                case 'sed':
+                case 'lsattr':
+                case 'chattr':
+                case 'tmpwatch':
+                    output = `\r\n${command}: simulated or not implemented in OliveOS terminal.`;
+                    break;
+                case 'head': {
+                    let path = args[1];
+                    let n = parseInt(args[2] || '10', 10);
+                    let node = getNode(resolvePath(path));
+                    if (!node || !isFile(node)) {
+                        output = `\r\nhead: ${path}: No such file`;
+                    } else {
+                        output = '\r\n' + node.content.split(/\r?\n/).slice(0, n).join('\r\n');
+                    }
+                    break;
+                }
+                case 'tail': {
+                    let path = args[1];
+                    let n = parseInt(args[2] || '10', 10);
+                    let node = getNode(resolvePath(path));
+                    if (!node || !isFile(node)) {
+                        output = `\r\ntail: ${path}: No such file`;
+                    } else {
+                        let lines = node.content.split(/\r?\n/);
+                        output = '\r\n' + lines.slice(-n).join('\r\n');
+                    }
+                    break;
+                }
+                case 'cut': {
+                    let path = args[1];
+                    let node = getNode(resolvePath(path));
+                    let delim = args.includes('-d') ? args[args.indexOf('-d')+1] : '\t';
+                    let field = args.includes('-f') ? parseInt(args[args.indexOf('-f')+1], 10) : 1;
+                    if (!node || !isFile(node)) {
+                        output = `\r\ncut: ${path}: No such file`;
+                    } else {
+                        output = '\r\n' + node.content.split(/\r?\n/).map(l => l.split(delim)[field-1] || '').join('\r\n');
+                    }
+                    break;
+                }
+                case 'grep': {
+                    let pattern = args[1];
+                    let path = args[2];
+                    let node = getNode(resolvePath(path));
+                    if (!pattern || !path) { output = '\r\ngrep: usage: grep pattern file'; break; }
+                    if (!node || !isFile(node)) {
+                        output = `\r\ngrep: ${path}: No such file`;
+                    } else {
+                        let re = new RegExp(pattern);
+                        output = '\r\n' + node.content.split(/\r?\n/).filter(l => re.test(l)).join('\r\n');
+                    }
+                    break;
+                }
+                case 'vim':
+                case 'vi':
+                case 'emacs':
+                case 'du':
+                case 'df':
+                case 'chmod':
+                case 'chown':
+                case 'chgrp':
+                case 'mount':
+                case 'umount':
+                case 'lsblk':
+                case 'blkid':
+                case 'fsck':
+                    output = `\r\n${command}: not implemented in OliveOS terminal.`;
+                    break;
+                default:
+                    if (command.trim() !== '') {
+                        output = `\r\n\x1b[31m${command}: command not found\x1b[0m`;
+                        console.warn(`[Terminal] Command not found: ${command}`);
+                    }
+            }
+            term.write(output);
+            printPrompt();
+        } catch (err) {
+            term.write('\r\n[!] Internal error occurred.');
+            console.error('[Terminal] Internal error in runCommand:', err);
+        }
+      }
+      term.onData(data => {
+        try {
+            if (nanoActive) return; // Ignore input if nano is active
+            // Real-time syntax highlighting for flags (only --flag and its value)
+            if (data.length === 1 && data >= ' ' && data <= '~') {
+                buffer += data;
+                // Clear current line
+                term.write('\x1b[2K\r');
+                // Write prompt
+                term.write(prompt());
+                // Parse buffer for highlighting
+                let display = '';
+                let i = 0;
+                while (i < buffer.length) {
+                    if (buffer[i] === '-' && buffer[i+1] === '-') {
+                        // Start of a flag
+                        let flagStart = i;
+                        let flagEnd = i+2;
+                        // Find end of flag (space or end)
+                        while (flagEnd < buffer.length && buffer[flagEnd] !== ' ') flagEnd++;
+                        display += '\x1b[90m' + buffer.slice(flagStart, flagEnd) + '\x1b[0m';
+                        i = flagEnd;
+                    } else {
+                        // Normal text
+                        let nextFlag = buffer.indexOf('--', i);
+                        let end = nextFlag === -1 ? buffer.length : nextFlag;
+                        display += buffer.slice(i, end);
+                        i = end;
+                    }
+                }
+                term.write(display);
+                return;
+            }
+            // Handle special keys and input processing
+            switch (data) {
+                case '\u001b[3~': // PrtSc
+                    term.write('\r\nScreenshot feature coming soon!\r\n');
+                    printPrompt();
+                    break;
+                case '\u001b[5~': // Page Up
+                    term.write('\r\nPage Up feature coming soon!\r\n');
+                    printPrompt();
+                    break;
+                case '\u001b[6~': // Page Down
+                    term.write('\r\nPage Down feature coming soon!\r\n');
+                    printPrompt();
+                    break;
+                case '\r': // Enter
+                    term.write('\r\n');
+                    runCommand(buffer);
+                    buffer = '';
+                    break;
+                case '\u007f': // Backspace
+                    // Only allow backspace if buffer is not empty
+                    if (buffer.length > 0) {
+                        buffer = buffer.slice(0, -1);
+                        // Clear current line
+                        term.write('\x1b[2K\r');
+                        term.write(prompt());
+                        // Parse buffer for highlighting
+                        let display = '';
+                        let i = 0;
+                        while (i < buffer.length) {
+                            if (buffer[i] === '-' && buffer[i+1] === '-') {
+                                let flagStart = i;
+                                let flagEnd = i+2;
+                                while (flagEnd < buffer.length && buffer[flagEnd] !== ' ') flagEnd++;
+                                display += '\x1b[90m' + buffer.slice(flagStart, flagEnd) + '\x1b[0m';
+                                i = flagEnd;
+                            } else {
+                                let nextFlag = buffer.indexOf('--', i);
+                                let end = nextFlag === -1 ? buffer.length : nextFlag;
+                                display += buffer.slice(i, end);
+                                i = end;
+                            }
+                        }
+                        term.write(display);
+                    }
+                    break;
+                default:
+                    if (data.match(/^[ -~]+$/)) {
+                        // Already handled above
+                        return;
+                    }
+            }
+        } catch (err) {
+            term.write('\r\n[!] Error processing input.');
+            console.error('[Terminal] Error in onData:', err);
+        }
+      });
+      printPrompt();
+    });
+    // --- Resize terminal to match iframe size if embedded ---
+    function resizeTerminalToIframe() {
+        try {
+            const termDiv = document.getElementById('terminal');
+            const setSize = () => {
+                // Always use 100vw/100vh to fill parent, but also check parentNode if inside iframe
+                let w = window.innerWidth;
+                let h = window.innerHeight;
+                if (window.frameElement && window.frameElement.parentElement) {
+                    // If embedded, use parent element's size
+                    const parentRect = window.frameElement.parentElement.getBoundingClientRect();
+                    w = parentRect.width;
+                    h = parentRect.height;
+                }
+                termDiv.style.width = w + 'px';
+                termDiv.style.height = h + 'px';
+                if (term && term.resize) {
+                    // Estimate cols/rows for xterm.js
+                    const charW = 9; // Approximate monospace char width
+                    const charH = 18; // Approximate monospace char height
+                    const cols = Math.max(20, Math.floor(w / charW));
+                    const rows = Math.max(5, Math.floor(h / charH));
+                    term.resize(cols, rows);
+                }
+            };
+            window.addEventListener('resize', setSize);
+            setSize();
+        } catch (e) {}
+    }
+    resizeTerminalToIframe();
+    // --- File API communication ---
+    // The terminal will launch nano with a file path (and optionally file content)
+    // Communication is via localStorage (set by terminal)
+
+    function setNanoFileLocalStorage(filePath, content) {
+      localStorage.setItem('nano_file_path', filePath);
+      localStorage.setItem('nano_file_content', content);
+    }
+    function getNanoFileLocalStorage() {
+      return {
+        file: localStorage.getItem('nano_file_path') || '',
+        content: localStorage.getItem('nano_file_content') || ''
+      };
+    }
+  </script>
+</body>
+</html>

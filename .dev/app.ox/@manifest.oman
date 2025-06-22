@@ -19,4 +19,5 @@ width = 800                      # Initial window width
 height = 600                     # Initial window height
 resizable = true                 # Whether the window is resizable
 fullscreen = false               # Whether the app runs in fullscreen mode
+invisible = false                # If true, app does not show on taskbar unless open
 

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nano Editor - OliveOS</title>
+  <link rel="stylesheet" href="index.css">
+  <style>
+    html, body { height: 100%; margin: 0; background: #181818; color: #e0e0e0; font-family: monospace; }
+    .nano-header { background: #222; color: #6cf; padding: 4px 12px; font-weight: bold; }
+    .nano-status { background: #333; color: #fff; padding: 2px 12px; font-size: 13px; }
+    .nano-shortcuts { background: #222; color: #6cf; padding: 2px 12px; font-size: 13px; }
+    .nano-editor { width: 100%; height: calc(100vh - 80px); background: #181818; color: #e0e0e0; border: none; resize: none; font-family: monospace; font-size: 16px; outline: none; }
+    #nano-filename { color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="nano-header">GNU nano 7.2 <span id="nano-filename"></span></div>
+  <div class="nano-status" id="nano-status">[ New File ]</div>
+  <textarea class="nano-editor" id="nano-editor" spellcheck="false"></textarea>
+  <div class="nano-shortcuts">
+    <span>^O Write Out</span>
+    <span>^X Exit</span>
+    <span>^G Help</span>
+    <span>^K Cut</span>
+    <span>^U Uncut</span>
+    <span>^W Where Is</span>
+  </div>
+  <script src="index.js"></script>
+</body>
+</html>

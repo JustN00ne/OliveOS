@@ -19,12 +19,12 @@
     border-radius: 200px;
     justify-content: flex-start;
     align-items: center;
-    padding: 0 10px;
+    padding: 0 15px;
 }
 
 .logo_container_main{
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -74,37 +74,36 @@
     align-items: center;
     gap: 8px; /* Spacing between app icons */
     height: 100%;
-    padding: 0 10px; /* Padding inside the wrapper */
 }
 
 .taskbar-app-icon {
-    width: 42px; /* Adjust size as needed */
-    height: 42px;
-    padding: 4px; /* Optional padding around image */
-    background-color: rgba(255, 255, 255, 0.1); /* Subtle background */
-    border-radius: 8px; /* Rounded corners */
+    width: 35px;
+    height: 35px;
+    border-radius: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
     box-sizing: border-box;
+    position: relative; /* For indicator positioning */
 }
+
 
 .taskbar-app-icon:hover {
     background-color: rgba(255, 255, 255, 0.2);
-    transform: translateY(-2px);
+    transform: scale(1.05);
 }
 
 .taskbar-app-icon:active {
-    transform: translateY(0px);
+    transform: scale(0.95);
 }
 
 .taskbar-app-icon img {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    border-radius: 4px; /* Slight rounding for the image itself if smaller than container */
+    border-radius: 100%;
 }
 
 .app_window.show-app {
@@ -114,7 +113,7 @@
 }
 .app_window.focused {
     box-shadow: 0 12px 36px rgba(0,0,0,0.22);
-    border: 2px solid var(--color-blueberry);
+    border: 0.1px solid #ffffff18;
 }
 .app_window.minimized {
     opacity: 0;
@@ -135,4 +134,17 @@
         left: 1vw !important;
         min-width: 0;
     }
+}
+
+.taskbar-app-icon.focused .taskbar-app-indicator {
+    width: 22px;
+    background: var(--color-blueberry, #4a90e2);
+    opacity: 1;
+}
+
+.taskbar-app-icon.minimized .taskbar-app-indicator,
+.taskbar-app-icon:not(.focused) .taskbar-app-indicator {
+    width: 10px;
+    background: var(--color-dark-camo, #888);
+    opacity: 0.5;
 }

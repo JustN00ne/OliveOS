@@ -1,3 +1,126 @@
+// --- OliveFS: LocalStorage-based Virtual Filesystem ---
+// Usage: window.OliveFS.readFile('/foo/bar.txt'), etc.
+window.OliveFS = (function() {
+    const FS_KEY = 'oliveos_fs_v2';
+    // Internal: get full FS tree
+    function getFS() {
+        const raw = localStorage.getItem(FS_KEY);
+        if (!raw) return { '/': { type: 'dir', children: {} } };
+        try { return JSON.parse(raw); } catch { return { '/': { type: 'dir', children: {} } }; }
+    }
+    // Internal: save FS tree
+    function saveFS(fs) {
+        localStorage.setItem(FS_KEY, JSON.stringify(fs));
+    }
+    // Normalize path (always starts with /, no trailing / except root)
+    function norm(p) {
+        if (!p.startsWith('/')) p = '/' + p;
+        if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+        return p;
+    }
+    // Split path into parts
+    function parts(p) {
+        return norm(p).split('/').filter(Boolean);
+    }
+    // Traverse to parent dir, return [parentObj, name]
+    function traverse(fs, p) {
+        const ps = parts(p);
+        let cur = fs['/'];
+        for (let i = 0; i < ps.length - 1; ++i) {
+            if (!cur.children[ps[i]] || cur.children[ps[i]].type !== 'dir') return [null, null];
+            cur = cur.children[ps[i]];
+        }
+        return [cur, ps[ps.length - 1]];
+    }
+    // API
+    return {
+        exists(path) {
+            path = norm(path);
+            const fs = getFS();
+            if (path === '/') return true;
+            const [par, name] = traverse(fs, path);
+            return !!(par && par.children[name]);
+        },
+        isDir(path) {
+            path = norm(path);
+            const fs = getFS();
+            if (path === '/') return true;
+            const [par, name] = traverse(fs, path);
+            return !!(par && par.children[name] && par.children[name].type === 'dir');
+        },
+        mkdir(path) {
+            path = norm(path);
+            if (path === '/') return;
+            const fs = getFS();
+            const [par, name] = traverse(fs, path);
+            if (!par) throw new Error('Parent dir does not exist');
+            if (par.children[name]) throw new Error('File or dir exists');
+            par.children[name] = { type: 'dir', children: {}, created: Date.now(), modified: Date.now() };
+            saveFS(fs);
+        },
+        writeFile(path, data) {
+            path = norm(path);
+            if (path === '/') throw new Error('Cannot write to root');
+            const fs = getFS();
+            const [par, name] = traverse(fs, path);
+            if (!par) throw new Error('Parent dir does not exist');
+            par.children[name] = {
+                type: 'file',
+                data: typeof data === 'string' ? data : JSON.stringify(data),
+                created: par.children[name]?.created || Date.now(),
+                modified: Date.now(),
+                size: (typeof data === 'string' ? data.length : JSON.stringify(data).length)
+            };
+            saveFS(fs);
+        },
+        readFile(path) {
+            path = norm(path);
+            if (path === '/') throw new Error('Cannot read root');
+            const fs = getFS();
+            const [par, name] = traverse(fs, path);
+            if (!par || !par.children[name] || par.children[name].type !== 'file') throw new Error('File not found');
+            return par.children[name].data;
+        },
+        deleteFile(path) {
+            path = norm(path);
+            if (path === '/') throw new Error('Cannot delete root');
+            const fs = getFS();
+            const [par, name] = traverse(fs, path);
+            if (!par || !par.children[name]) throw new Error('Not found');
+            delete par.children[name];
+            saveFS(fs);
+        },
+        listDir(path) {
+            path = norm(path);
+            const fs = getFS();
+            let cur = fs['/'];
+            if (path !== '/') {
+                const [par, name] = traverse(fs, path);
+                if (!par || !par.children[name] || par.children[name].type !== 'dir') throw new Error('Dir not found');
+                cur = par.children[name];
+            }
+            return Object.entries(cur.children).map(([name, obj]) => ({
+                name,
+                type: obj.type,
+                size: obj.size || 0,
+                created: obj.created,
+                modified: obj.modified
+            }));
+        },
+        stat(path) {
+            path = norm(path);
+            const fs = getFS();
+            if (path === '/') return { type: 'dir', name: '/', created: 0, modified: 0 };
+            const [par, name] = traverse(fs, path);
+            if (!par || !par.children[name]) throw new Error('Not found');
+            const obj = par.children[name];
+            return { type: obj.type, name, size: obj.size || 0, created: obj.created, modified: obj.modified };
+        },
+        // For debugging: reset FS
+        _reset() { localStorage.removeItem(FS_KEY); }
+    };
+})();
+
 lucide.createIcons(); // Initialize Feather icons globally
 
 // Pill animation logic
@@ -64,14 +187,14 @@ function createAppWindow(app) {
     if (app.icon && app.icon.endsWith('.png')) {
         iconHtml = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${app.iconFallback}'" class="fade-icon" />`;
     } else {
-        iconHtml = `<i data-lucide="${app.icon}"></i>`;
+        iconHtml = `<i class="lucide" data-lucide="${app.icon}"></i>`;
     }
     win.innerHTML = `
         <div class="head_m drag_handle">
             <div class="buttons_control">
-                <button data-tooltip="Close the window" class="close_b_a_m fade-hover"><i data-lucide="x"></i></button>
-                <button data-tooltip="Minimize the window" class="min_b_a_m fade-hover"><i data-lucide="minimize-2"></i></button>
-                <button data-tooltip="Maximize the window" class="windowcontrol_b_a_m fade-hover" disabled><i data-lucide="maximize-2"></i></button>
+                <button class="close_b_a_m fade-hover"><i class="lucide" data-lucide="x"></i></button>
+                <button class="min_b_a_m fade-hover"><i class="lucide" data-lucide="minimize-2"></i></button>
+                <button class="windowcontrol_b_a_m fade-hover" disabled><i class="lucide" data-lucide="maximize-2"></i></button>
             </div>
             <div class="app_divider"></div>
             <div class="app_icon">${iconHtml}</div>
@@ -93,13 +216,27 @@ function createAppWindow(app) {
     win.style.width = '700px';
     win.style.height = '400px';
     // Animate in
-    setTimeout(() => win.classList.add('show-app'), 10);
+    setTimeout(() => {
+        win.classList.add('anim-opening');
+        win.classList.remove('hidden');
+        setTimeout(() => win.classList.remove('anim-opening'), 250);
+    }, 10);
     // Button events
-    win.querySelector('.close_b_a_m').onclick = () => closeApp(app.id);
-    win.querySelector('.min_b_a_m').onclick = () => minimizeApp(app.id);
+    win.querySelector('.close_b_a_m').onclick = () => {
+        win.classList.add('anim-closing');
+        setTimeout(() => closeApp(app.id), 220);
+    };
+    win.querySelector('.min_b_a_m').onclick = () => {
+        win.classList.add('anim-minimizing');
+        setTimeout(() => {
+            win.classList.remove('anim-minimizing');
+            minimizeApp(app.id);
+        }, 220);
+    };
     // Maximize button is disabled for now
     // Add drag events
     makeWindowDraggable(win);
+    setTimeout(() => { if (window.lucide) window.lucide.createIcons(); }, 0);
     return win;
 }
 
@@ -220,6 +357,8 @@ function openApp(appId) {
     focusedAppIndex = openApps.length - 1;
     win.classList.remove('hidden');
     focusApp(appId);
+    // Set document title to app name
+    if (app.name) document.title = app.name;
 }
 
 function closeApp(appId) {
@@ -306,6 +445,10 @@ async function loadDynamicApps() {
                 let [k, v] = line.split('=').map(s => s.trim());
                 // Remove quotes if present
                 if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+                // Parse booleans for invisible
+                if (k === 'invisible') {
+                    v = (v === 'true' || v === '1');
+                }
                 result[section][k] = v;
             }
         });
@@ -313,7 +456,8 @@ async function loadDynamicApps() {
     }
     // Find all app folders
     const appRoot = 'data/applicaton';
-    const res = await fetch('/list-apps'); // Custom endpoint to list app folders
+    // Fetch all apps, including invisible, so they can be opened directly
+    const res = await fetch('/list-apps?all=true'); // Custom endpoint to list app folders
     const appFolders = await res.json();
     for (const folder of appFolders) {
         try {
@@ -321,81 +465,108 @@ async function loadDynamicApps() {
             if (!manifestRes.ok) continue;
             const manifestText = await manifestRes.text();
             const manifest = parseOman(manifestText);
-            // Get @app.oman for sources
-            const appOmanRes = await fetch(`/${appRoot}/${folder}/source/app/@app.oman`);
-            const appOmanText = appOmanRes.ok ? await appOmanRes.text() : '';
-            const appOman = parseOman(appOmanText);
-            // Compose app info
+            // --- Use manifest for all app info ---
+            // Get app id and display name
             const appId = manifest.app?.id || folder;
             const appName = manifest.app?.name || folder;
-            // Fix: Clean up workingDir and htmlFile
+            // Icon path (relative to app folder)
+            let appIcon = undefined;
+            if (manifest.app?.icon) {
+                // If icon starts with /, treat as relative to app folder
+                appIcon = `/${appRoot}/${folder}${manifest.app.icon.startsWith('/') ? manifest.app.icon : '/' + manifest.app.icon}`;
+            } else {
+                // Fallback: try /source/assets/icon.png
+                appIcon = `/${appRoot}/${folder}/source/assets/icon.png`;
+            }
+            // Working directory (where @app.oman is)
             let workingDir = manifest.runtime?.working_directory || '/source/app/';
             workingDir = workingDir.trim().replace(/\\/g, '/').replace(/\s+/g, '');
-            // Remove trailing slash for workingDir
             if (workingDir.endsWith('/')) workingDir = workingDir.slice(0, -1);
-            // Compose iframe path using @app.oman sources
+            // Read @app.oman from working_directory
+            let appOman = {};
             let htmlFile = 'index.html';
-            if (appOman.sources) {
-                // Find the first file that exists in sources
-                for (const key in appOman.sources) {
-                    if (appOman.sources[key]) {
-                        htmlFile = appOman.sources[key].trim().replace(/\\/g, '/').replace(/\s+/g, '');
-                        if (htmlFile.startsWith('/')) htmlFile = htmlFile.slice(1);
-                        break;
+            try {
+                const appOmanRes = await fetch(`/${appRoot}/${folder}${workingDir}/@app.oman`);
+                if (appOmanRes.ok) {
+                    const appOmanText = await appOmanRes.text();
+                    appOman = parseOman(appOmanText);
+                    // Find the first .html file in sources
+                    if (appOman.sources) {
+                        for (const key in appOman.sources) {
+                            if (appOman.sources[key] && appOman.sources[key].endsWith('.html')) {
+                                htmlFile = appOman.sources[key].replace(/^\//, '');
+                                break;
+                            }
+                        }
                     }
                 }
-            }
+            } catch {}
             // Compose iframe path
-            let iframePath = `/${appRoot}/${folder}` + (workingDir ? `/${workingDir}` : '') + `/${htmlFile}`;
-            // Fix double slashes in iframePath except after http(s):
+            let iframePath = `/${appRoot}/${folder}${workingDir ? `/${workingDir}` : ''}/${htmlFile}`;
             iframePath = iframePath.replace(/\\/g, '/').replace(/\s+/g, '');
             iframePath = iframePath.replace(/([^:])\/+/g, '$1/');
-            // Try both possible icon locations
-            let appIcon = undefined;
-            // 1. Try /assets/icon.png (old location)
-            let iconPath1 = `/${appRoot}/${folder}/assets/icon.png`;
-            // 2. Try /source/assets/icon.png (new location)
-            let iconPath2 = `/${appRoot}/${folder}/source/assets/icon.png`;
-            // We'll check if the file exists later in the UI, but prefer iconPath2 if it exists
-            appIcon = iconPath2;
-            // Set default width/height if not defined
-            let width = manifest.window?.width ? parseInt(manifest.window.width) : 700;
-            let height = manifest.window?.height ? parseInt(manifest.window.height) : 400;
-            // Set default resizable/fullscreen if not defined
-            let resizable = manifest.window?.resizable !== undefined ? manifest.window.resizable === 'true' : true;
-            let fullscreen = manifest.window?.fullscreen !== undefined ? manifest.window.fullscreen === 'true' : false;
+            // UI config
+            const ui = manifest.ui || {};
+            let width = ui.width ? parseInt(ui.width) : 700;
+            let height = ui.height ? parseInt(ui.height) : 400;
+            let resizable = ui.resizable !== undefined ? (ui.resizable === 'true' || ui.resizable === true) : true;
+            let fullscreen = ui.fullscreen !== undefined ? (ui.fullscreen === 'true' || ui.fullscreen === true) : false;
+            let type = ui.type || 'windowed';
+            let invisible = false;
+            if (typeof ui.invisible !== 'undefined') {
+                invisible = ui.invisible === true;
+            }
             // Register app in appTemplates
             appTemplates.push({
                 id: appId,
                 name: appName,
                 icon: appIcon,
-                iconFallback: iconPath1,
                 iframe: iframePath,
                 width,
                 height,
                 resizable,
-                fullscreen
+                fullscreen,
+                type,
+                invisible
             });
         } catch (e) { console.warn('Failed to load app', folder, e); }
     }
 }
 
 // --- Render dynamic app icons in the taskbar app_wrapper ---
-function renderTaskbarAppIcons() {
+async function renderTaskbarAppIcons() {
     const wrapper = document.getElementById('taskbar_app_icons');
     wrapper.innerHTML = '';
+    // Get visible and all app lists
+    const visibleRes = await fetch('/list-apps');
+    const visibleApps = await visibleRes.json();
+    const allRes = await fetch('/list-apps?all=true');
+    const allApps = await allRes.json();
+    // Find invisible apps (in allApps but not in visibleApps)
+    const invisibleAppIds = allApps.filter(x => !visibleApps.includes(x));
     appTemplates.forEach(app => {
-        // Only show launchers for non-background apps
-        if (app.fullscreen === false && app.type !== 'background') {
+        const isOpen = openApps.find(a => a.id === app.id);
+        if (
+            (app.fullscreen === false && app.type !== 'background') &&
+            (!app.invisible || isOpen)
+        ) {
             const icon = document.createElement('div');
             icon.className = 'taskbar-app-icon fade-hover';
+            // If app is invisible (not in visibleApps), add app_invisible class
+            if (invisibleAppIds.includes(app.id) && !isOpen) {
+                icon.classList.add('app_invisible');
+            }
             if (app.icon && app.icon.endsWith('.png')) {
                 icon.innerHTML = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${app.iconFallback}'" class="fade-icon" />`;
             } else {
                 icon.innerHTML = `<i data-lucide="${app.icon || 'globe'}"></i>`;
             }
             icon.title = app.name;
+            icon.id = 'taskbar_icon_' + app.id;
             icon.onclick = () => openApp(app.id);
+            if (isOpen) {
+                icon.classList.add('open-indicator');
+            }
             wrapper.appendChild(icon);
         }
     });
@@ -423,3 +594,86 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupAppScaling();
     setupWindowFocusOnClick();
 });
+
+// --- Simple Terminal App using Xterm.js and node-pty ---
+if (window.location.pathname.includes('terminal.html')) {
+    const termContainer = document.getElementById('terminal');
+    const term = new window.Terminal({
+        cursorBlink: true,
+        fontFamily: 'monospace',
+        fontSize: 16,
+        theme: { background: '#181818', foreground: '#e0e0e0' }
+    });
+    term.open(termContainer);
+    term.focus();
+    let cwd = '/';
+    let prompt = () => `olive@oliveos:${cwd}$ `;
+    let buffer = '';
+    function printPrompt() {
+        term.write('\r\n' + prompt());
+    }
+    function runCommand(cmd) {
+        const args = cmd.trim().split(/\s+/);
+        const command = args[0];
+        switch (command) {
+            case 'help':
+                term.writeln('\r\nAvailable commands: help, clear, echo, ls, cd, pwd, date, whoami, about, exit');
+                break;
+            case 'clear':
+                term.clear();
+                break;
+            case 'echo':
+                term.writeln(args.slice(1).join(' '));
+                break;
+            case 'ls':
+                term.writeln('Desktop  Documents  Downloads  Music  Pictures  Videos');
+                break;
+            case 'cd':
+                if (args[1]) {
+                    if (args[1] === '..') {
+                        cwd = cwd === '/' ? '/' : cwd.split('/').slice(0, -1).join('/') || '/';
+                    } else {
+                        cwd = cwd === '/' ? `/${args[1]}` : `${cwd}/${args[1]}`;
+                    }
+                }
+                break;
+            case 'pwd':
+                term.writeln(cwd);
+                break;
+            case 'date':
+                term.writeln(new Date().toString());
+                break;
+            case 'whoami':
+                term.writeln('olive');
+                break;
+            case 'about':
+                term.writeln('OliveOS Terminal - Simulated shell.');
+                break;
+            case 'exit':
+                term.writeln('logout');
+                setTimeout(() => window.close(), 500);
+                break;
+            default:
+                if (command.trim() !== '')
+                    term.writeln(`${command}: command not found`);
+        }
+    }
+    printPrompt();
+    term.onData(data => {
+        for (let ch of data) {
+            if (ch === '\r') {
+                runCommand(buffer);
+                buffer = '';
+                printPrompt();
+            } else if (ch === '\u007F') { // Backspace
+                if (buffer.length > 0) {
+                    buffer = buffer.slice(0, -1);
+                    term.write('\b \b');
+                }
+            } else if (ch >= ' ' && ch <= '~') {
+                buffer += ch;
+                term.write(ch);
+            }
+        }
+    });
+}

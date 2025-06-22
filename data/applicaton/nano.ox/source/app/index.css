@@ -1,0 +1,53 @@
+body {
+  margin: 0;
+  font-family: monospace;
+  background: #181818;
+  color: #e0e0e0;
+}
+.nano-header, .nano-status, .nano-shortcuts {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5em 1em;
+  background: #222;
+  color: #b5e853;
+  font-weight: bold;
+}
+.nano-header {
+  border-bottom: 1px solid #333;
+}
+.nano-status {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  font-size: 0.95em;
+  border-top: 1px solid #333;
+  border-bottom: 1px solid #333;
+}
+.nano-shortcuts {
+  background: #222;
+  color: #b5e853;
+  font-size: 0.95em;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1em;
+}
+.nano-editor {
+  width: 100%;
+  height: calc(100vh - 6em);
+  background: #181818;
+  color: #e0e0e0;
+  font-family: monospace;
+  font-size: 1.1em;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 1em;
+  box-sizing: border-box;
+}
+
+/* Nano Editor Styles */
+#nano-header { background: #222; color: #6cf; padding: 4px 12px; font-weight: bold; }
+#nano-status { background: #333; color: #fff; padding: 2px 12px; font-size: 13px; }
+#nano-shortcuts { background: #222; color: #6cf; padding: 2px 12px; font-size: 13px; }
+#nano-editor { width: 100%; height: calc(100vh - 80px); background: #181818; color: #e0e0e0; border: none; resize: none; font-family: monospace; font-size: 16px; outline: none; }
+#nano-filename { color: #fff; }

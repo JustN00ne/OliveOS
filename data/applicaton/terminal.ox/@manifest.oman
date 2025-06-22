@@ -1,0 +1,21 @@
+# OliveOS Terminal App Manifest
+@#[app]
+id = "olive.terminal.ox"
+name = "Terminal"
+version = "1.0.0"
+author = "OliveOS"
+description = "A simple terminal app using Xterm.js and node-pty."
+icon = "/source/assets/icon.png"
+
+@#[runtime]
+entry = "terminal.ox"
+args = ""
+working_directory = "/source/app/"
+permissions = "filesystem, network"
+
+@#[ui]
+type = "windowed"
+width = "900"
+height = "500"
+resizable = "true"
+fullscreen = "false"
