@@ -48,30 +48,65 @@ editor.addEventListener('keydown', (e) => {
   // Save: Ctrl+S
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
     e.preventDefault();
-    localStorage.setItem('nano_file_path', filePath);
-    localStorage.setItem('nano_file_content', editor.value);
-    status.textContent = '[ Saved ' + (filePath || 'New File') + ' ]';
+    if (!filePath) {
+      const newPath = prompt('Save as (path):', '/untitled.txt');
+      if (newPath) {
+        saveToOliveFSOrLocal(newPath, editor.value);
+        status.textContent = '[ Saved ' + newPath + ' ]';
+      } else {
+        status.textContent = '[ Save cancelled ]';
+      }
+    } else {
+      saveToOliveFSOrLocal(filePath, editor.value);
+      status.textContent = '[ Saved ' + (filePath || 'New File') + ' ]';
+    }
     setTimeout(() => status.textContent = `[ ${filePath || 'New File'} ]`, 1200);
     return;
   }
   // WriteOut: Ctrl+O
   if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')) {
     e.preventDefault();
-    localStorage.setItem('nano_file_path', filePath);
-    localStorage.setItem('nano_file_content', editor.value);
-    status.textContent = '[ Wrote ' + (filePath || 'New File') + ' ]';
+    if (!filePath) {
+      const newPath = prompt('Write file as (path):', '/untitled.txt');
+      if (newPath) {
+        saveToOliveFSOrLocal(newPath, editor.value);
+        status.textContent = '[ Wrote ' + newPath + ' ]';
+      } else {
+        status.textContent = '[ Write cancelled ]';
+      }
+    } else {
+      saveToOliveFSOrLocal(filePath, editor.value);
+      status.textContent = '[ Wrote ' + (filePath || 'New File') + ' ]';
+    }
     setTimeout(() => status.textContent = `[ ${filePath || 'New File'} ]`, 1200);
     return;
   }
   // Exit: Ctrl+X
   if ((e.ctrlKey || e.metaKey) && (e.key === 'x' || e.key === 'X')) {
     e.preventDefault();
-    localStorage.setItem('nano_file_path', filePath);
-    localStorage.setItem('nano_file_content', editor.value);
+    saveToOliveFSOrLocal(filePath, editor.value);
     window.close();
     return;
   }
 });
+
+// Helper: Save to OliveFS if available, else fallback to localStorage
+function saveToOliveFSOrLocal(filePath, content) {
+  if (filePath && window.parent && window.parent.OliveFS) {
+    try {
+      window.parent.OliveFS.writeFile(filePath, content);
+      return true;
+    } catch (e) {
+      status.textContent = '[ OliveFS error: ' + e.message + ' ]';
+      setTimeout(() => status.textContent = `[ ${filePath || 'New File'} ]`, 1200);
+      return false;
+    }
+  } else {
+    localStorage.setItem('nano_file_path', filePath);
+    localStorage.setItem('nano_file_content', content);
+    return true;
+  }
+}
 
 // Focus editor on load
 window.onload = () => editor.focus();
