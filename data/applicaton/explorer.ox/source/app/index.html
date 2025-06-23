@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>File Explorer</title>
+    <link rel="stylesheet" href="../assets/explorer.css">
+    <style>
+        body { font-family: system-ui, sans-serif; background: #181818; color: #e0e0e0; margin: 0; }
+        #explorer { display: flex; height: 100vh; }
+        #sidebar { width: 220px; background: #232323; border-right: 1px solid #333; padding: 0.5em; box-sizing: border-box; }
+        #main { flex: 1; padding: 1em; overflow: auto; }
+        .file, .folder { padding: 0.3em 0.7em; border-radius: 4px; margin: 2px 0; cursor: pointer; display: flex; align-items: center; }
+        .file:hover, .folder:hover { background: #292929; }
+        .icon { margin-right: 0.7em; }
+        .selected { background: #2d4a7a; }
+        #toolbar { margin-bottom: 0.7em; }
+        #toolbar button { margin-right: 0.5em; }
+        #file-content { white-space: pre-wrap; background: #222; padding: 1em; border-radius: 6px; min-height: 120px; }
+        input[type=text] { background: #222; color: #e0e0e0; border: 1px solid #444; border-radius: 3px; padding: 2px 6px; }
+    </style>
+</head>
+<body>
+<div id="explorer">
+    <div id="sidebar">
+        <div id="toolbar">
+            <button id="btn-up">⬆️ Up</button>
+            <button id="btn-new-folder">📁 New Folder</button>
+            <button id="btn-new-file">📄 New File</button>
+            <button id="btn-delete">🗑️ Delete</button>
+        </div>
+        <div id="dir-list"></div>
+    </div>
+    <div id="main">
+        <h2 id="current-path">/</h2>
+        <div id="file-content"></div>
+    </div>
+</div>
+    <script src="/index.js"></script>   <!-- Correct path to the OS script with OliveFS -->
+    <script src="index.js"></script>   <!-- The File Explorer's specific logic -->
+</body>
+</html>

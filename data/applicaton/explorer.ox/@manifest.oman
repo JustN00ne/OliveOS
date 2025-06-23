@@ -1,0 +1,15 @@
+@#[app]
+id = explorer.ox
+name = File Explorer
+icon = folder
+
+@#[runtime]
+working_directory = /source/app/
+
+@#[ui]
+width = 800
+height = 500
+resizable = true
+fullscreen = false
+type = windowed
+invisible = true

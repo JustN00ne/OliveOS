@@ -1,0 +1,8 @@
+# Minimal @app.oman for Explorer app
+[app]
+id = "explorer.ox"
+name = "File Explorer"
+icon = "/source/assets/icon.png"
+
+[sources]
+main = "index.html"

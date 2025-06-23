@@ -1,3 +1,24 @@
+// --- Global Logging Utility ---
+window.LogStore = [];
+window.LogType = {
+  0: "INFO",
+  1: "WARN",
+  2: "ERRR",
+  3: "CRIT",
+  info: 0,
+  warning: 1,
+  error: 2,
+  critical: 3,
+};
+window.Log = function Log(source, message, type = 0) {
+  if (typeof type === 'string' && window.LogType[type] !== undefined) type = window.LogType[type];
+  if (!window.LogType[type]) return;
+  const timestamp = new Date().toJSON();
+  const msg = `[${window.LogType[type]}] ${source}: ${message}`;
+  console.log(msg);
+  window.LogStore.push(msg);
+};
+
 // This file is intentionally left blank for the terminal app.
 
 // Remove device info simulation, restore olive command to simple info

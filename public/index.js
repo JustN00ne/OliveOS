@@ -1,124 +1,239 @@
-// --- OliveFS: LocalStorage-based Virtual Filesystem ---
+// --- Global Logging Utility ---
+window.LogStore = [];
+window.LogType = {
+  0: "INFO",
+  1: "WARN",
+  2: "ERRR",
+  3: "CRIT",
+  info: 0,
+  warning: 1,
+  error: 2,
+  critical: 3,
+};
+window.Log = function Log(source, message, type = 0) {
+  if (typeof type === 'string' && window.LogType[type] !== undefined) type = window.LogType[type];
+  if (!window.LogType[type]) return;
+  const timestamp = new Date().toJSON();
+  const msg = `[${window.LogType[type]}] ${timestamp} | ${source}: ${message}`;
+  console.log(msg);
+  window.LogStore.push(msg);
+};
+
+// --- OliveFS: Hybrid Filesystem (DB for /cloud, IndexedDB for others) ---
 // Usage: window.OliveFS.readFile('/foo/bar.txt'), etc.
 window.OliveFS = (function() {
     const FS_KEY = 'oliveos_fs_v2';
-    // Internal: get full FS tree
-    function getFS() {
-        const raw = localStorage.getItem(FS_KEY);
-        if (!raw) return { '/': { type: 'dir', children: {} } };
-        try { return JSON.parse(raw); } catch { return { '/': { type: 'dir', children: {} } }; }
+    const CLOUD_PREFIX = '/cloud';
+    // --- IndexedDB helpers ---
+    const DB_NAME = 'oliveos_fs_idb';
+    const STORE_NAME = 'files';
+    function idbPromisify(req) {
+        return new Promise((resolve, reject) => {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
     }
-    // Internal: save FS tree
-    function saveFS(fs) {
-        localStorage.setItem(FS_KEY, JSON.stringify(fs));
-    }
-    // Normalize path (always starts with /, no trailing / except root)
-    function norm(p) {
-        if (!p.startsWith('/')) p = '/' + p;
-        if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
-        return p;
-    }
-    // Split path into parts
-    function parts(p) {
-        return norm(p).split('/').filter(Boolean);
-    }
-    // Traverse to parent dir, return [parentObj, name]
-    function traverse(fs, p) {
-        const ps = parts(p);
-        let cur = fs['/'];
-        for (let i = 0; i < ps.length - 1; ++i) {
-            if (!cur.children[ps[i]] || cur.children[ps[i]].type !== 'dir') return [null, null];
-            cur = cur.children[ps[i]];
-        }
-        return [cur, ps[ps.length - 1]];
-    }
-    // API
-    return {
-        exists(path) {
-            path = norm(path);
-            const fs = getFS();
-            if (path === '/') return true;
-            const [par, name] = traverse(fs, path);
-            return !!(par && par.children[name]);
-        },
-        isDir(path) {
-            path = norm(path);
-            const fs = getFS();
-            if (path === '/') return true;
-            const [par, name] = traverse(fs, path);
-            return !!(par && par.children[name] && par.children[name].type === 'dir');
-        },
-        mkdir(path) {
-            path = norm(path);
-            if (path === '/') return;
-            const fs = getFS();
-            const [par, name] = traverse(fs, path);
-            if (!par) throw new Error('Parent dir does not exist');
-            if (par.children[name]) throw new Error('File or dir exists');
-            par.children[name] = { type: 'dir', children: {}, created: Date.now(), modified: Date.now() };
-            saveFS(fs);
-        },
-        writeFile(path, data) {
-            path = norm(path);
-            if (path === '/') throw new Error('Cannot write to root');
-            const fs = getFS();
-            const [par, name] = traverse(fs, path);
-            if (!par) throw new Error('Parent dir does not exist');
-            par.children[name] = {
-                type: 'file',
-                data: typeof data === 'string' ? data : JSON.stringify(data),
-                created: par.children[name]?.created || Date.now(),
-                modified: Date.now(),
-                size: (typeof data === 'string' ? data.length : JSON.stringify(data).length)
+    function idbOpen() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = () => {
+                req.result.createObjectStore(STORE_NAME);
             };
-            saveFS(fs);
-        },
-        readFile(path) {
-            path = norm(path);
-            if (path === '/') throw new Error('Cannot read root');
-            const fs = getFS();
-            const [par, name] = traverse(fs, path);
-            if (!par || !par.children[name] || par.children[name].type !== 'file') throw new Error('File not found');
-            return par.children[name].data;
-        },
-        deleteFile(path) {
-            path = norm(path);
-            if (path === '/') throw new Error('Cannot delete root');
-            const fs = getFS();
-            const [par, name] = traverse(fs, path);
-            if (!par || !par.children[name]) throw new Error('Not found');
-            delete par.children[name];
-            saveFS(fs);
-        },
-        listDir(path) {
-            path = norm(path);
-            const fs = getFS();
-            let cur = fs['/'];
-            if (path !== '/') {
-                const [par, name] = traverse(fs, path);
-                if (!par || !par.children[name] || par.children[name].type !== 'dir') throw new Error('Dir not found');
-                cur = par.children[name];
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        });
+    }
+    async function idbGet(path) {
+        const db = await idbOpen();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        return idbPromisify(store.get(path));
+    }
+    async function idbSet(path, data) {
+        const db = await idbOpen();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        return idbPromisify(store.put(data, path));
+    }
+    async function idbDelete(path) {
+        const db = await idbOpen();
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        return idbPromisify(store.delete(path));
+    }
+    async function idbList(dir) {
+        const db = await idbOpen();
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        return new Promise((resolve, reject) => {
+            const files = [];
+            const req = store.openCursor();
+            req.onsuccess = function() {
+                const cursor = req.result;
+                if (cursor) {
+                    if (cursor.key.startsWith(dir === '/' ? '/' : dir + '/')) {
+                        const rel = cursor.key.slice(dir.length);
+                        if (rel && !rel.slice(1).includes('/')) {
+                            files.push({ name: rel.replace(/^\//, ''), type: 'file' });
+                        }
+                    }
+                    cursor.continue();
+                } else {
+                    resolve(files);
+                }
+            };
+            req.onerror = () => reject(req.error);
+        });
+    }
+    // --- DB (cloud) helpers ---
+    async function dbListDir(path) {
+        // For demo: fetch all, filter client-side
+        const res = await fetch('/api/fs', { credentials: 'include' });
+        const data = await res.json();
+        const fs = data.fs || { '/': { type: 'dir', children: {} } };
+        let cur = fs['/'];
+        if (path !== '/') {
+            const parts = path.split('/').filter(Boolean);
+            for (const p of parts) {
+                if (!cur.children[p] || cur.children[p].type !== 'dir') throw new Error('Dir not found');
+                cur = cur.children[p];
             }
-            return Object.entries(cur.children).map(([name, obj]) => ({
-                name,
-                type: obj.type,
-                size: obj.size || 0,
-                created: obj.created,
-                modified: obj.modified
-            }));
+        }
+        return Object.entries(cur.children).map(([name, obj]) => ({
+            name,
+            type: obj.type,
+            size: obj.size || 0,
+            created: obj.created,
+            modified: obj.modified
+        }));
+    }
+    async function dbReadFile(path) {
+        const res = await fetch('/api/fs', { credentials: 'include' });
+        const data = await res.json();
+        const fs = data.fs || { '/': { type: 'dir', children: {} } };
+        const parts = path.split('/').filter(Boolean);
+        let cur = fs['/'];
+        for (let i = 0; i < parts.length - 1; ++i) {
+            if (!cur.children[parts[i]] || cur.children[parts[i]].type !== 'dir') throw new Error('Not found');
+            cur = cur.children[parts[i]];
+        }
+        const name = parts[parts.length - 1];
+        if (!cur.children[name] || cur.children[name].type !== 'file') throw new Error('File not found');
+        return cur.children[name].data;
+    }
+    async function dbWriteFile(path, data) {
+        // Download, update, upload
+        const res = await fetch('/api/fs', { credentials: 'include' });
+        const fsData = await res.json();
+        const fs = fsData.fs || { '/': { type: 'dir', children: {} } };
+        const parts = path.split('/').filter(Boolean);
+        let cur = fs['/'];
+        for (let i = 0; i < parts.length - 1; ++i) {
+            if (!cur.children[parts[i]]) cur.children[parts[i]] = { type: 'dir', children: {} };
+            cur = cur.children[parts[i]];
+        }
+        const name = parts[parts.length - 1];
+        cur.children[name] = {
+            type: 'file',
+            data: typeof data === 'string' ? data : JSON.stringify(data),
+            created: cur.children[name]?.created || Date.now(),
+            modified: Date.now(),
+            size: (typeof data === 'string' ? data.length : JSON.stringify(data).length)
+        };
+        await fetch('/api/fs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ fs })
+        });
+    }
+    async function dbDeleteFile(path) {
+        const res = await fetch('/api/fs', { credentials: 'include' });
+        const fsData = await res.json();
+        const fs = fsData.fs || { '/': { type: 'dir', children: {} } };
+        const parts = path.split('/').filter(Boolean);
+        let cur = fs['/'];
+        for (let i = 0; i < parts.length - 1; ++i) {
+            if (!cur.children[parts[i]]) throw new Error('Not found');
+            cur = cur.children[parts[i]];
+        }
+        const name = parts[parts.length - 1];
+        if (!cur.children[name]) throw new Error('Not found');
+        delete cur.children[name];
+        await fetch('/api/fs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ fs })
+        });
+    }
+    // --- API ---
+    function isCloud(path) {
+        return path.startsWith(CLOUD_PREFIX + '/') || path === CLOUD_PREFIX;
+    }
+    return {
+        async listDir(path) {
+            path = path || '/';
+            if (isCloud(path)) return await dbListDir(path);
+            return await idbList(path);
         },
-        stat(path) {
-            path = norm(path);
-            const fs = getFS();
-            if (path === '/') return { type: 'dir', name: '/', created: 0, modified: 0 };
-            const [par, name] = traverse(fs, path);
-            if (!par || !par.children[name]) throw new Error('Not found');
-            const obj = par.children[name];
-            return { type: obj.type, name, size: obj.size || 0, created: obj.created, modified: obj.modified };
+        async readFile(path) {
+            if (isCloud(path)) return await dbReadFile(path);
+            const data = await idbGet(path);
+            if (typeof data === 'undefined') throw new Error('File not found');
+            return data;
         },
-        // For debugging: reset FS
-        _reset() { localStorage.removeItem(FS_KEY); }
+        async writeFile(path, data) {
+            if (isCloud(path)) return await dbWriteFile(path, data);
+            return await idbSet(path, data);
+        },
+        async deleteFile(path) {
+            if (isCloud(path)) return await dbDeleteFile(path);
+            return await idbDelete(path);
+        },
+        async mkdir(path) {
+            // Only support mkdir for /cloud (DB) or as a no-op for IndexedDB (simulate folder)
+            if (isCloud(path)) {
+                // Download, update, upload
+                const res = await fetch('/api/fs', { credentials: 'include' });
+                const fsData = await res.json();
+                const fs = fsData.fs || { '/': { type: 'dir', children: {} } };
+                const parts = path.split('/').filter(Boolean);
+                let cur = fs['/'];
+                for (let i = 0; i < parts.length; ++i) {
+                    const p = parts[i];
+                    if (!cur.children[p]) cur.children[p] = { type: 'dir', children: {} };
+                    if (cur.children[p].type !== 'dir') throw new Error('Not a directory');
+                    cur = cur.children[p];
+                }
+                await fetch('/api/fs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ fs })
+                });
+            } else {
+                // IndexedDB: no real folders, but can simulate by creating a hidden file
+                return await idbSet(path.replace(/\/$/, '') + '/.dir', '__dir__');
+            }
+        },
+        // For debugging: reset all
+        async _reset() {
+            // Clear both DB and IndexedDB
+            await fetch('/api/fs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ fs: { '/': { type: 'dir', children: {} } } }) });
+            const db = await idbOpen();
+            db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME).clear();
+        },
+        async _loadFromDB() {
+            // No-op for now (hybrid OliveFS does not need to preload)
+            return;
+        }
     };
+})();
+
+// On login/page load, load FS from DB (no-op for hybrid OliveFS, but safe to call)
+(async function syncFSOnLogin() {
+    await window.OliveFS._loadFromDB();
 })();
 
 lucide.createIcons(); // Initialize Feather icons globally
@@ -194,9 +309,10 @@ function createAppWindow(app) {
         win.style.msUserSelect = val ? 'none' : '';
     }
     // Icon fallback logic: try main, fallback if error
+    const fallbackIconPath = '/assets/image/default/fav/logo.svg';
     let iconHtml = '';
     if (app.icon && app.icon.endsWith('.png')) {
-        iconHtml = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${app.iconFallback}'" class="fade-icon" />`;
+        iconHtml = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${fallbackIconPath}'" class="fade-icon" />`;
     } else {
         iconHtml = `<i class="lucide" data-lucide="${app.icon}"></i>`;
     }
@@ -219,13 +335,25 @@ function createAppWindow(app) {
     // Make resizable
     win.style.resize = 'both';
     win.style.overflow = 'auto';
-    win.style.minWidth = '320px';
-    win.style.minHeight = '200px';
+    // Responsive/min/max logic
+    if (app.minWidth) win.style.minWidth = typeof app.minWidth === 'number' ? app.minWidth + 'px' : app.minWidth;
+    if (app.minHeight) win.style.minHeight = typeof app.minHeight === 'number' ? app.minHeight + 'px' : app.minHeight;
+    if (app.maxWidth) win.style.maxWidth = typeof app.maxWidth === 'number' ? app.maxWidth + 'px' : app.maxWidth;
+    if (app.maxHeight) win.style.maxHeight = typeof app.maxHeight === 'number' ? app.maxHeight + 'px' : app.maxHeight;
     win.style.position = 'absolute';
     win.style.left = '300px';
     win.style.top = '200px';
-    win.style.width = '700px';
-    win.style.height = '400px';
+    // Responsive width/height
+    if (typeof app.width === 'string' && (app.width.endsWith('vw') || app.width.endsWith('vh') || app.width === 'responsive')) {
+        win.style.width = app.width === 'responsive' ? '100vw' : app.width;
+    } else if (typeof app.width === 'number') {
+        win.style.width = app.width + 'px';
+    }
+    if (typeof app.height === 'string' && (app.height.endsWith('vw') || app.height.endsWith('vh') || app.height === 'responsive')) {
+        win.style.height = app.height === 'responsive' ? '100vh' : app.height;
+    } else if (typeof app.height === 'number') {
+        win.style.height = app.height + 'px';
+    }
     // --- Disable iframe pointer events while resizing ---
     let resizing = false;
     let resizeObserver = new ResizeObserver(() => {
@@ -570,8 +698,12 @@ async function loadDynamicApps() {
             iframePath = iframePath.replace(/([^:])\/+/g, '$1/');
             // UI config
             const ui = manifest.ui || {};
-            let width = ui.width ? parseInt(ui.width) : 700;
-            let height = ui.height ? parseInt(ui.height) : 400;
+            let width = ui.width ? (isNaN(Number(ui.width)) ? ui.width : parseInt(ui.width)) : 700;
+            let height = ui.height ? (isNaN(Number(ui.height)) ? ui.height : parseInt(ui.height)) : 400;
+            let minWidth = ui.min_width ? (isNaN(Number(ui.min_width)) ? ui.min_width : parseInt(ui.min_width)) : 320;
+            let minHeight = ui.min_height ? (isNaN(Number(ui.min_height)) ? ui.min_height : parseInt(ui.min_height)) : 200;
+            let maxWidth = ui.max_width ? (isNaN(Number(ui.max_width)) ? ui.max_width : parseInt(ui.max_width)) : null;
+            let maxHeight = ui.max_height ? (isNaN(Number(ui.max_height)) ? ui.max_height : parseInt(ui.max_height)) : null;
             let resizable = ui.resizable !== undefined ? (ui.resizable === 'true' || ui.resizable === true) : true;
             let fullscreen = ui.fullscreen !== undefined ? (ui.fullscreen === 'true' || ui.fullscreen === true) : false;
             let type = ui.type || 'windowed';
@@ -587,10 +719,15 @@ async function loadDynamicApps() {
                 iframe: iframePath,
                 width,
                 height,
+                minWidth,
+                minHeight,
+                maxWidth,
+                maxHeight,
                 resizable,
                 fullscreen,
                 type,
-                invisible
+                invisible,
+                iconFallback: '/assets/image/default/fav/logo.svg' // <-- ADD THIS LINE
             });
         } catch (e) { console.warn('Failed to load app', folder, e); }
     }
@@ -620,6 +757,8 @@ async function renderTaskbarAppIcons() {
                 icon.classList.add('app_invisible');
             }
             if (app.icon && app.icon.endsWith('.png')) {
+                // We already defined iconFallback in loadDynamicApps, so this will now work correctly.
+                // The path itself within app.iconFallback is already correct from the change above.
                 icon.innerHTML = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${app.iconFallback}'" class="fade-icon" />`;
             } else {
                 icon.innerHTML = `<i data-lucide="${app.icon || 'globe'}"></i>`;

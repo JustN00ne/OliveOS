@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Explorer</title>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/public/assets/css/index.css"
+</head>
+<body>
+    <div class="top_header">
+        <div class="expl_search">
+            <div class="search-container">
+                <input type="text" id="search" class="search-input" autocomplete="off" placeholder=" ">
+                <div class="search_cont-wr">
+                <span class="search-icon">
+                    <i data-lucide="search"></i>
+                    <span class="search-text">Search</span>
+                </span>
+                </div>
+                <div id="suggestions" class="suggestions" hidden></div>
+            </div>
+        </div>
+        <div class="action_bar">
+            <button id="new-file" class="action-button moretext">
+                <i data-lucide="file-plus-2"></i> <span class="action-text">New File</span>
+            </button>
+            <button id="new-folder" class="action-button moretext">
+                <i data-lucide="folder-plus"></i> <span class="action-text">New Folder</span>
+            </button>
+            <button id="cut-file" class="action-button">
+                <i data-lucide="scissors"></i> 
+            </button>
+            <button id="copy-file" class="action-button">
+                <i data-lucide="copy"></i> 
+            </button>
+            <button id="paste-file" class="action-button">
+                <i data-lucide="clipboard-paste"></i> 
+            </button>
+            <button id="rename-file" class="action-button">
+                <i data-lucide="folder-pen"></i> 
+            </button>
+            <button id="delete-file" class="action-button trash">
+                <i data-lucide="trash-2"></i> 
+            </button>
+            <div class="divider_expl"></div>
+            <button id="sort-all" class="action-button moretext">
+                <i data-lucide="arrow-down-wide-narrow"></i> <span class="action-text">Sort All</span> <div class="divider_expl_sm"></div> <i data-lucide="chevron-down"></i>
+            </button>
+            <button id="layout-all" class="action-button moretext">
+                <i data-lucide="panels-top-left"></i> <span class="action-text">Layout</span> <div class="divider_expl_sm"></div> <i data-lucide="chevron-down"></i>
+            </button>
+
+            <!-- The ones below only too show if window is too smol-->
+
+            <button id="new-more" class="action-button moretext">
+                <i data-lucide="file-plus-2"></i> <span class="action-text">New</span> <div class="divider_expl_sm"></div> <i data-lucide="chevron-down"></i>
+            </button>
+
+            <button id="operations-more" class="action-button moretext">
+                <i data-lucide="wrench"></i> <span class="action-text">Operations</span> <div class="divider_expl_sm"></div> <i data-lucide="chevron-down"></i>
+            </button>
+
+            <button id="overall-more" class="action-button moretext">
+                <i data-lucide="list-collapse"></i> <span class="action-text">More</span> <div class="divider_expl_sm"></div> <i data-lucide="chevron-down"></i>
+            </button>
+
+            <button id="show-all" class="action-button moretext">
+                <i data-lucide="ellipsis-vertical"></i> <span class="action-text">Show all options</span> <div class="divider_expl_sm"></div> <i data-lucide="chevron-down"></i>
+            </button>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+    lucide.createIcons();
+    </script>
+    <script src="index.js"></script>
+
+</body>
+</html>

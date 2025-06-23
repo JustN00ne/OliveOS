@@ -1,0 +1,19 @@
+body{
+    margin: 0;
+    background-color: transparent;
+}
+
+.top_header{
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+}
+
+.search-container{
+    position: relative;
+    width: fit-content;
+    flex: 1;
+    border-radius: 1000000px;
+    background-color: #00000088;
+}

@@ -13,11 +13,32 @@ const cheerio = require('cheerio');
 const iconv = require('iconv-lite');
 const cookieParser = require('cookie-parser');
 
+// --- Global Logging Utility ---
+const LogStore = [];
+const LogType = {
+  0: "INFO",
+  1: "WARN",
+  2: "ERRR",
+  3: "CRIT",
+  info: 0,
+  warning: 1,
+  error: 2,
+  critical: 3,
+};
+function Log(source, message, type = 0) {
+  if (typeof type === 'string' && LogType[type] !== undefined) type = LogType[type];
+  if (!LogType[type]) return;
+  const timestamp = new Date().toJSON();
+  const msg = `[${LogType[type]}] ${timestamp} | ${source}: ${message}`;
+  console.log(msg);
+  LogStore.push(msg);
+}
+
 // --- Supabase Client Setup ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-console.log('{log} Connected to Supabase.');
+Log('{log} Connected to Supabase.');
 
 // Log environment variables for debugging
 
@@ -26,15 +47,15 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
 // Log server start
-console.log(`[Server] Starting on port ${PORT}`);
+Log('[Server] Starting on port ' + PORT);
 
 let globalData = {};
 const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
 try {
   globalData = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
-  console.log('[Server] Loaded global data from', globalDataPath);
+  Log('[Server] Loaded global data from ' + globalDataPath);
 } catch (err) {
-  console.warn('Warning: Failed to load global data for Handlebars template:', err.message);
+  Log('[Server] Failed to load global data for Handlebars template: ' + err.message, 'warning');
 }
 app.engine('hbs', exphbs.engine({ extname: '.hbs', defaultLayout: false }));
 app.set('view engine', 'hbs');
@@ -49,7 +70,7 @@ app.use(cookieParser());
 
 // Log all requests
 app.use((req, res, next) => {
-  console.log(`[Request] ${req.method} ${req.url}`);
+  Log('[Request] ' + req.method + ' ' + req.url);
   next();
 });
 
@@ -71,10 +92,10 @@ app.get('/login', (req, res) => {
 app.all('/proxy', (req, res) => {
   const targetUrl = req.method === 'POST' ? req.body.url : req.query.url;
   if (!targetUrl) {
-    console.error('[Proxy] Missing ?url');
+    Log('[Proxy] Missing ?url', null, 'error');
     return res.status(400).send('Missing ?url');
   }
-  console.log(`[Proxy] Proxying request to: ${targetUrl}`);
+  Log('[Proxy] Proxying request to: ' + targetUrl);
   request({
     url: targetUrl,
     headers: {
@@ -83,7 +104,7 @@ app.all('/proxy', (req, res) => {
     encoding: null,
   }, (err, response, body) => {
     if (err || !response) {
-      console.error('[Proxy] Request failed:', err);
+      Log('[Proxy] Request failed: ' + err, null, 'error');
       return res.status(500).send('Request failed');
     }
     const contentType = response.headers['content-type'] || '';
@@ -161,7 +182,7 @@ app.all('/proxy', (req, res) => {
               $el.attr(attr, `/proxy?url=${encodeURIComponent(abs)}`);
             }
           } catch (e) {
-            console.warn(`URL rewrite failed for: ${val}`, e.message);
+            Log('URL rewrite failed for: ' + val + ' - ' + e.message, null, 'warning');
           }
         });
       });
@@ -197,7 +218,7 @@ app.all('/proxy', (req, res) => {
                     try {
                       value = '/proxy?url=' + encodeURIComponent(new URL(value, window.__proxyBase).toString());
                     } catch (e) {
-                      console.warn('URL rewrite error:', e);
+                      Log('URL rewrite error: ' + e, null, 'warning');
                     }
                   }
                   descriptor.set.call(this, value);
@@ -307,12 +328,40 @@ app.all('/proxy', (req, res) => {
       `;
       $('script:first').before(`<script>${injectionScript}</script>`);
       res.setHeader('Content-Type', 'text/html');
-      console.log('[Proxy] HTML content proxied.');
+      Log('[Proxy] HTML content proxied.');
       return res.send($.html());
     }
     res.setHeader('Content-Type', contentType);
     res.send(body);
   });
+});
+
+// --- User Filesystem API ---
+// Requires authentication
+app.get('/api/fs', requireSupabaseAuth, async (req, res) => {
+  const userId = req.supabaseUser.id;
+  // Try to fetch the user's FS from Supabase (table: user_filesystems)
+  const { data, error } = await supabase
+    .from('user_filesystems')
+    .select('fs')
+    .eq('user_id', userId)
+    .single();
+  if (error && error.code !== 'PGRST116') { // PGRST116: no rows found
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ fs: data?.fs || null });
+});
+
+app.post('/api/fs', requireSupabaseAuth, async (req, res) => {
+  const userId = req.supabaseUser.id;
+  const { fs } = req.body;
+  if (!fs) return res.status(400).json({ error: 'Missing fs' });
+  // Upsert user's FS
+  const { error } = await supabase
+    .from('user_filesystems')
+    .upsert({ user_id: userId, fs }, { onConflict: ['user_id'] });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
 });
 
 // --- Filesystem API Routes ---
@@ -341,7 +390,7 @@ app.post('/api/filesystem/list/*', async (req, res) => {
       });
     }
     // Log operation
-    console.log(`[${operationId}] LIST ${path}`);
+    Log(`[${operationId}] LIST ${path}`);
     res.json({
       success: true,
       files,
@@ -364,7 +413,7 @@ app.post('/api/filesystem/create/*', async (req, res) => {
   const operationId = 'op_' + Date.now() + Math.random().toString(36).substr(2, 6);
   try {
     if (!type || (type !== 'file' && type !== 'folder')) {
-      console.error(`[${operationId}] Invalid type specified:`, type);
+      Log(`[${operationId}] Invalid type specified: ${type}`, null, 'warning');
       throw new Error('Invalid type specified. Must be "file" or "folder"');
     }
     // In a real app, you'd create the file/folder in Supabase Storage here
@@ -377,7 +426,7 @@ app.post('/api/filesystem/create/*', async (req, res) => {
       operationId
     };
     // Log operation
-    console.log(`[${operationId}] CREATE ${type} at ${path}`);
+    Log(`[${operationId}] CREATE ${type} at ${path}`);
     res.json({
       success: true,
       message: `${type === 'file' ? 'File' : 'Folder'} created successfully`,
@@ -406,7 +455,7 @@ app.post('/api/filesystem/delete/*', async (req, res) => {
       operationId
     };
     // Log operation
-    console.log(`[${operationId}] DELETE ${path}`);
+    Log(`[${operationId}] DELETE ${path}`);
     res.json({
       success: true,
       message: 'Item deleted successfully',
@@ -465,20 +514,18 @@ app.get('/list-apps', (req, res) => {
         folders.push(folder); // fallback: show if error
       }
     }
-    console.log(`[list-apps] Found app folders:`, folders);
+    Log(`[list-apps] Found app folders: ${folders.join(', ')}`);
     res.json(folders);
   });
 });
 
-// --- CLI logic removed for Vercel compatibility ---
-if (process.env.NODE_ENV !== 'production') {
-  console.log('Nodemon is watching for changes...');
-}
-
-// Start the server
-server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+// --- /api/whoami endpoint ---
+app.get('/api/whoami', (req, res) => {
+  // For now, return a dummy user object or 401 if not logged in
+  // You can add real auth logic here later
+  res.json({ user: { id: 'demo', name: 'Demo User' } });
 });
 
-console.log("Server is running in https://localhost:" + PORT);
-module.exports = app;
+server.listen(PORT, () => {
+  Log('[Server] Listening on port ' + PORT);
+});
