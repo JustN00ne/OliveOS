@@ -446,6 +446,9 @@ function makeWindowDraggable(win, setUserSelectNone) {
         winHeight = winRect.height;
         win.classList.add('dragging');
         if (setUserSelectNone) setUserSelectNone(true);
+        // Disable iframe interaction while dragging
+        const iframe = win.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'none';
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
         e.preventDefault();
@@ -467,6 +470,9 @@ function makeWindowDraggable(win, setUserSelectNone) {
         isDragging = false;
         win.classList.remove('dragging');
         if (setUserSelectNone) setUserSelectNone(false);
+        // Restore iframe interaction after dragging
+        const iframe = win.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = '';
         document.removeEventListener('mousemove', onMouseMove);
         document.removeEventListener('mouseup', onMouseUp);
     }
@@ -484,6 +490,9 @@ function makeWindowDraggable(win, setUserSelectNone) {
         winHeight = winRect.height;
         win.classList.add('dragging');
         if (setUserSelectNone) setUserSelectNone(true);
+        // Disable iframe interaction while dragging (touch)
+        const iframe = win.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = 'none';
         document.addEventListener('touchmove', onTouchMove, {passive:false});
         document.addEventListener('touchend', onTouchEnd);
         e.preventDefault();
@@ -504,6 +513,9 @@ function makeWindowDraggable(win, setUserSelectNone) {
         isDragging = false;
         win.classList.remove('dragging');
         if (setUserSelectNone) setUserSelectNone(false);
+        // Restore iframe interaction after dragging (touch)
+        const iframe = win.querySelector('iframe');
+        if (iframe) iframe.style.pointerEvents = '';
         document.removeEventListener('touchmove', onTouchMove);
         document.removeEventListener('touchend', onTouchEnd);
     }
