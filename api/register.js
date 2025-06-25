@@ -18,33 +18,27 @@ router.post('/', express.json(), async (req, res) => {
   if (error) {
     return res.status(400).json({ error: error.message });
   }
-  res.json({ success: true, user: data.user });
+  // On success, redirect to index page
+  return res.redirect('/');
 });
 
 // Google OAuth endpoint
-router.get('/google', async (req, res) => {
-  const redirectTo = req.query.redirectTo || 'https://zoiqztkjexeadgnnulpg.supabase.co/auth/v1/callback';
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo }
-  });
-  if (error) {
-    return res.status(400).json({ error: error.message });
-  }
-  res.redirect(data.url);
+router.get('/google', (req, res) => {
+  // Dynamically determine the app URL from the request
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const appUrl = `${protocol}://${host}`;
+  const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(appUrl)}`;
+  res.redirect(providerUrl);
 });
 
 // Discord OAuth endpoint
-router.get('/discord', async (req, res) => {
-  const redirectTo = req.query.redirectTo || 'https://zoiqztkjexeadgnnulpg.supabase.co/auth/v1/callback';
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'discord',
-    options: { redirectTo }
-  });
-  if (error) {
-    return res.status(400).json({ error: error.message });
-  }
-  res.redirect(data.url);
+router.get('/discord', (req, res) => {
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const appUrl = `${protocol}://${host}`;
+  const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(appUrl)}`;
+  res.redirect(providerUrl);
 });
 
 module.exports = router;
