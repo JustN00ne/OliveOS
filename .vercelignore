@@ -1,2 +1,9 @@
-.env 
+# Ignore local development files
+.env
+nodemon.json
+
+# Ignore node_modules, as Vercel installs them fresh
 node_modules
+
+# Ignore development-only packages if you have them
+package.dev-scripts.json
