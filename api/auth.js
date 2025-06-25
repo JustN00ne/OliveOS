@@ -70,4 +70,18 @@ router.post('/logout', (req, res) => {
   res.redirect('/login');
 });
 
+// --- NEW: Endpoint to set the auth cookie from a client-side session ---
+router.post('/set-session', express.json(), (req, res) => {
+  const { session } = req.body;
+
+  if (!session || !session.access_token) {
+    return res.status(400).json({ error: 'No session provided.' });
+  }
+
+  // Set the cookie using the access token from the client-side session
+  res.cookie('sb-access-token', session.access_token, { httpOnly: true, sameSite: 'Lax' });
+  
+  return res.status(200).json({ message: 'Session cookie set successfully.' });
+});
+
 module.exports = { router, requireSupabaseAuth };

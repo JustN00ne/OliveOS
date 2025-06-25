@@ -322,5 +322,49 @@
         }
     });
     </script>
+    <script>
+      window.SUPABASE_URL = '{{SUPABASE_URL}}';
+      window.SUPABASE_ANON_KEY = '{{SUPABASE_ANON_KEY}}';
+    </script>
+    <script type="module">
+      import { supabase } from '/assets/js/supabaseClient.js';
+      // Listen for OAuth sign-in
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          // Send session to backend to set cookie
+          await fetch('/api/auth/set-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session })
+          });
+          // Redirect to home
+          window.location.href = '/';
+        }
+      });
+    </script>
+    <script>
+      // Clock and date updater
+      function updateClockAndDate() {
+        const now = new Date();
+        const dateElem = document.getElementById('date_currently');
+        const timeElem = document.getElementById('time_currently');
+        if (dateElem) {
+          // Format: DD.MM.YYYY
+          const day = String(now.getDate()).padStart(2, '0');
+          const month = String(now.getMonth() + 1).padStart(2, '0');
+          const year = now.getFullYear();
+          dateElem.textContent = `${day}.${month}.${year}`;
+        }
+        if (timeElem) {
+          // Format: HH:MM:SS
+          const hours = String(now.getHours()).padStart(2, '0');
+          const minutes = String(now.getMinutes()).padStart(2, '0');
+          const seconds = String(now.getSeconds()).padStart(2, '0');
+          timeElem.textContent = `${hours}:${minutes}:${seconds}`;
+        }
+      }
+      setInterval(updateClockAndDate, 1000);
+      updateClockAndDate();
+    </script>
 </body>
 </html>

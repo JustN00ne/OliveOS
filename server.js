@@ -86,7 +86,11 @@ app.get('/', requireSupabaseAuth, (req, res) => {
 
 // --- Login Route (Public) ---
 app.get('/login', (req, res) => {
-  res.render('login', { ...globalData });
+  res.render('login', {
+    ...globalData,
+    SUPABASE_URL: SUPABASE_URL,
+    SUPABASE_ANON_KEY: SUPABASE_ANON_KEY
+  });
 });
 
 // --- Proxy Endpoint for Iframe Embedding (improved version) ---
