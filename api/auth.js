@@ -1,8 +1,8 @@
-// /api/auth.js
+// W:\OliveOS V2 Web\api\auth.js
+
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
-const cookieParser = require('cookie-parser');
 
 const router = express.Router();
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -11,6 +11,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Middleware to require authentication
 function requireSupabaseAuth(req, res, next) {
+  // Use 'sb-access-token' to be consistent with your existing code
   const token = req.cookies['sb-access-token'] || req.headers['authorization'];
   if (!token) return res.redirect('/login');
   supabase.auth.getUser(token).then(({ data, error }) => {
@@ -20,7 +21,30 @@ function requireSupabaseAuth(req, res, next) {
   }).catch(() => res.redirect('/login'));
 }
 
-// Login endpoint
+// --- NEW: Registration Endpoint ---
+// Handles POST requests to /api/auth/register
+router.post('/register', express.json(), (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
+    }
+
+    supabase.auth.signUp({ email, password }).then(({ data, error }) => {
+        if (error || !data.session) {
+            console.error('Supabase Registration Error:', error?.message);
+            return res.status(401).json({ error: error?.message || 'Registration failed' });
+        }
+        
+        // On successful registration, log the user in immediately by setting the cookie
+        res.cookie('sb-access-token', data.session.access_token, { httpOnly: true, sameSite: 'Lax' });
+        
+        // Return success and user data. The front-end will handle the redirect.
+        res.json({ success: true, user: data.user });
+    });
+});
+
+
+// Login endpoint (your existing code)
 router.post('/login', express.json(), (req, res) => {
   const { email, password } = req.body;
   supabase.auth.signInWithPassword({ email, password }).then(({ data, error }) => {
@@ -28,11 +52,19 @@ router.post('/login', express.json(), (req, res) => {
       return res.status(401).json({ error: error?.message || 'Invalid credentials' });
     }
     res.cookie('sb-access-token', data.session.access_token, { httpOnly: true, sameSite: 'Lax' });
-    res.json({ success: true });
+    
+    // Check if the request prefers HTML for redirection
+    if (req.accepts('html')) {
+      // For a form submission that doesn't use JS, this would redirect.
+      // Since your form uses JS fetch, we send JSON and let the client redirect.
+      return res.json({ success: true, user: data.user });
+    }
+    // Default to sending JSON
+    res.json({ success: true, user: data.user });
   });
 });
 
-// Logout endpoint
+// Logout endpoint (your existing code)
 router.post('/logout', (req, res) => {
   res.clearCookie('sb-access-token');
   res.redirect('/login');
