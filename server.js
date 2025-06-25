@@ -94,30 +94,25 @@ app.get('/', requireSupabaseAuth, (req, res) => {
 
 // New, self-contained /login route
 app.get('/login', (req, res) => {
-  let context = {}; // Start with a fresh context for this request
+    // WE ARE NOT READING ANY FILES. WE ARE HARDCODING EVERYTHING.
+    // This eliminates all variables except the code itself.
+    const context = {
+        // This is the value from your data.json, corrected.
+        background_image_main: "/assets/image/default/bg.jpg", 
+        // Add the required Supabase keys for the client-side script.
+        supabaseUrl: process.env.SUPABASE_URL,
+        supabaseAnonKey: process.env.SUPABASE_ANON_KEY
+    };
 
-  try {
-    if (fs.existsSync(globalDataPath)) {
-      context = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
-      Log('[Login Route]', 'Successfully loaded data.json for login page.');
+    // Log exactly what we are sending to the template, for absolute certainty.
+    console.log("Rendering /login with context:", JSON.stringify(context, null, 2));
+
+    try {
+        res.render('login', context);
+    } catch (e) {
+        console.error("CRITICAL: Handlebars render crashed!", e);
+        res.status(500).send("Template rendering failed. Check server logs.");
     }
-  } catch (err) {
-    Log('[Login Route]', 'Error loading or parsing data.json: ' + err.message, 'warning');
-    context = {}; // On error, ensure context is an empty object
-  }
-
-  // Add Supabase keys to the context
-  context.supabaseUrl = process.env.SUPABASE_URL;
-  context.supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-  // SAFETY NET: If the specific key is STILL missing, add a default
-  if (!context.background_image_main) {
-    Log('[Login Route]', 'background_image_main missing, providing default.', 'warning');
-    context.background_image_main = '/assets/image/default/bg.jpg';
-  }
-
-  // Render the template with the guaranteed-to-be-correct context
-  res.render('login', context);
 });
 
 app.all('/proxy', (req, res) => {
