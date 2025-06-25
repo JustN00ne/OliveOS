@@ -91,11 +91,16 @@ app.get('/', requireSupabaseAuth, (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  res.render('login', {
-    ...globalData,
-    supabaseUrl: process.env.SUPABASE_URL,
-    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
-  });
+  const context = { ...globalData };
+  context.supabaseUrl = process.env.SUPABASE_URL;
+  context.supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+  if (!context.background_image_main) {
+    Log('[Server]', 'background_image_main is missing. Using fallback.', 'warning');
+    context.background_image_main = '/assets/image/default/bg.jpg'; 
+  }
+
+  res.render('login', context);
 });
 
 app.all('/proxy', (req, res) => {
