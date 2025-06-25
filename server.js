@@ -78,6 +78,10 @@ app.use((req, res, next) => {
 const { router: authRouter, requireSupabaseAuth } = require('./api/auth');
 app.use('/api', authRouter);
 
+// --- Register Router ---
+const registerRouter = require('./api/register');
+app.use('/api/register', registerRouter);
+
 // --- Home Route (Protected) ---
 app.get('/', requireSupabaseAuth, (req, res) => {
   res.render('index', { ...globalData, user: req.supabaseUser });

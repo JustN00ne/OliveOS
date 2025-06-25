@@ -132,4 +132,92 @@
 .inner_c_wr > button:hover{
     background-color: var(--color-berry-bush);
     transition: background-color 0.3s var(--easing-main);
+    cursor: pointer;
+}
+
+.inner_container{
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 20px;
+    color: white;
+    pointer-events: none;
+}
+
+.inner_container > *{
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.inc_divider{
+    border-radius: 100%;
+    width: 3px;
+    height: 3px;
+    background-color: var(--color-light-mode);
+    margin: 0 10px;
+}
+
+.inner_container_squared{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.quicksignup_container{
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+}
+
+.quicksignup_container > *{
+    height: 50px;
+    border-radius: 100px;
+    border: none;
+    outline: none;
+    font-size: 16px;
+    text-align: center;
+    font-family: 'Gramatika' , Arial, sans-serif;
+    pointer-events: all;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    scale: 1;
+    transition: all 0.3s var(--easing-main);
+}
+
+.quicksignup_container > *:hover{
+    cursor: pointer;
+}
+
+.qsb_g{
+    background-color: var(--color-light-mode);
+}
+
+.qsb_g:hover{
+    background-color: #bababa;
+}
+
+.qsb_d{
+    background-color: #5865F2;
+}
+
+.qsb_d:hover{
+    background-color: #4752C4;
+}
+
+.divider_signin{
+    height: 1px;
+    width: 100%;
+    background-color: var(--color-light-mode);
+    opacity: 0.5;
+    border-radius: 1000px;
 }
