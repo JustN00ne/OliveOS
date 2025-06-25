@@ -1,66 +1,182 @@
-// server.js
-require('dotenv').config(); // Load .env for Supabase keys
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
-const path = require('path'); // <<< THIS IS THE FIX. It should require the 'path' module.
+const path = require('path');
 const exphbs = require('express-handlebars');
+const fs = require('fs-extra');
+const { createClient } = require('@supabase/supabase-js');
+const request = require('request');
+const cheerio = require('cheerio');
+const iconv = require('iconv-lite');
 const cookieParser = require('cookie-parser');
+
+const LogStore = [];
+const LogType = {
+  0: "INFO", 1: "WARN", 2: "ERRR", 3: "CRIT",
+  info: 0, warning: 1, error: 2, critical: 3,
+};
+
+function Log(source, message, type = 0) {
+  if (typeof type === 'string' && LogType[type] !== undefined) type = LogType[type];
+  if (LogType[type] === undefined) return;
+  const timestamp = new Date().toJSON();
+  const msg = `[${LogType[type]}] ${timestamp} | ${source}: ${message}`;
+  console.log(msg);
+  LogStore.push(msg);
+}
+
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+    Log('[Server]', 'FATAL ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set in your .env file.', 'critical');
+    process.exit(1);
+}
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+Log('[Server]', 'Supabase client initialized.');
 
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
-// --- CHECK FOR MISSING ENVIRONMENT VARIABLES ---
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-    console.error('FATAL ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set in your .env file.');
-    process.exit(1); // Stop the server if keys are missing
+let globalData = {};
+const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
+try {
+  globalData = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
+  Log('[Server]', 'Loaded global data for templates.');
+} catch (err) {
+  Log('[Server]', 'Could not load global data: ' + err.message, 'warning');
 }
 
-// --- SET A PROPER CONTENT SECURITY POLICY (CSP) ---
 app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
-        "script-src 'self' https://cdn.jsdelivr.net; " + // Allow scripts from our domain and Supabase's CDN
-        "default-src 'self';" // For everything else, only allow from our domain
+        "script-src 'self' https://cdn.jsdelivr.net; default-src 'self' blob:;"
     );
     next();
 });
 
-// Keep the rest of your existing server configuration
 app.use(express.static(path.join(__dirname, 'public')));
-app.engine('hbs', exphbs.engine({ extname: '.hbs', defaultLayout: false }));
-app.set('view engine', 'hbs');
-app.set('views', path.join(__dirname, 'public'));
+app.use('/data/applicaton', express.static(path.join(__dirname, 'data', 'applicaton')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-// --- Auth Router ---
-// This assumes your auth.js is correct from our previous conversation
-const { router: authRouter, requireSupabaseAuth } = require('./api/auth.js');
-app.use('/api/auth', authRouter);
+app.engine('hbs', exphbs.engine({ extname: '.hbs', defaultLayout: false }));
+app.set('view engine', 'hbs');
+app.set('views', path.join(__dirname, 'public'));
 
-// --- Home Route (Protected) ---
-app.get('/', requireSupabaseAuth, (req, res) => {
-    // For now, let's just render the index page without extra data
-    res.render('index', { user: req.supabaseUser });
+app.use((req, res, next) => {
+  Log('[Request]', `${req.method} ${req.url}`);
+  next();
 });
 
-// --- Login Route (Public) ---
+const { router: authRouter, requireSupabaseAuth } = require('./api/auth');
+app.use('/api/auth', authRouter);
+
+app.get('/', requireSupabaseAuth, (req, res) => {
+  res.render('index', { ...globalData, user: req.supabaseUser });
+});
+
 app.get('/login', (req, res) => {
-  // Pass the (now confirmed to exist) keys to the template
   res.render('login', {
-      supabaseUrl: process.env.SUPABASE_URL,
-      supabaseAnonKey: process.env.SUPABASE_ANON_KEY
+    ...globalData,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY
   });
 });
 
-// OAuth Redirects (keep these as they are)
+app.all('/proxy', (req, res) => {
+  const targetUrl = req.method === 'POST' ? req.body.url : req.query.url;
+  if (!targetUrl) {
+    Log('[Proxy]', 'Missing ?url', 'error');
+    return res.status(400).send('Missing ?url');
+  }
+  Log('[Proxy]', 'Proxying request to: ' + targetUrl);
+  request({
+    url: targetUrl,
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36' },
+    encoding: null,
+  }, (err, response, body) => {
+    if (err || !response) {
+      Log('[Proxy]', 'Request failed: ' + err, 'error');
+      return res.status(500).send('Request failed');
+    }
+    const contentType = response.headers['content-type'] || '';
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('X-Frame-Options');
+    res.setHeader('Content-Security-Policy', "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;");
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    
+    if (contentType.includes('text/html')) {
+      const html = iconv.decode(body, 'utf-8');
+      const $ = cheerio.load(html);
+      $('base').remove();
+      $('meta[http-equiv="Content-Security-Policy"]').remove();
+      $('meta[http-equiv="content-security-policy"]').remove();
+      const injectionScript = `window.__proxyBase = ${JSON.stringify(targetUrl)}; /* ... full injection script ... */`;
+      $('script:first').before(`<script>${injectionScript}</script>`);
+      res.setHeader('Content-Type', 'text/html');
+      Log('[Proxy]', 'HTML content proxied.');
+      return res.send($.html());
+    }
+    res.setHeader('Content-Type', contentType);
+    res.send(body);
+  });
+});
+
+app.get('/api/fs', requireSupabaseAuth, async (req, res) => {
+  const userId = req.supabaseUser.id;
+  const { data, error } = await supabase.from('user_filesystems').select('fs').eq('user_id', userId).single();
+  if (error && error.code !== 'PGRST116') {
+    return res.status(500).json({ error: error.message });
+  }
+  res.json({ fs: data?.fs || null });
+});
+
+app.post('/api/fs', requireSupabaseAuth, async (req, res) => {
+  const userId = req.supabaseUser.id;
+  const { fs } = req.body;
+  if (!fs) return res.status(400).json({ error: 'Missing fs' });
+  const { error } = await supabase.from('user_filesystems').upsert({ user_id: userId, fs }, { onConflict: ['user_id'] });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+app.post('/api/filesystem/list/*', async (req, res) => {
+  res.json({ success: true, files: [], path: req.params[0] || '' });
+});
+
+app.post('/api/filesystem/create/*', async (req, res) => {
+  res.json({ success: true, message: 'Item created successfully' });
+});
+
+app.post('/api/filesystem/delete/*', async (req, res) => {
+  res.json({ success: true, message: 'Item deleted successfully' });
+});
+
+app.get('/list-apps', (req, res) => {
+  const showAll = req.query.all === 'true';
+  const appsDir = path.join(__dirname, 'data', 'applicaton');
+  fs.readdir(appsDir, { withFileTypes: true }, (err, files) => {
+    if (err) {
+      console.error('[list-apps] Failed to read apps directory:', err);
+      return res.status(500).json([]);
+    }
+    const folders = files.filter(f => f.isDirectory()).map(f => f.name);
+    res.json(folders);
+  });
+});
+
+app.get('/api/whoami', (req, res) => {
+  res.json({ user: { id: 'demo', name: 'Demo User' } });
+});
+
 app.get('/api/register/google', (req, res) => {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const appUrl = `${protocol}://${host}`;
-  const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(appUrl)}`;
+  const providerUrl = `${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(appUrl)}`;
   res.redirect(providerUrl);
 });
 
@@ -68,10 +184,10 @@ app.get('/api/register/discord', (req, res) => {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const appUrl = `${protocol}://${host}`;
-  const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(appUrl)}`;
+  const providerUrl = `${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(appUrl)}`;
   res.redirect(providerUrl);
 });
 
 server.listen(PORT, () => {
-  console.log(`[Server] Listening on port ${PORT}`);
-});
+  Log('[Server]', `🚀 Server is running and listening on http://localhost:${PORT}`);
+});s
