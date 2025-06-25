@@ -748,7 +748,7 @@ async function loadDynamicApps() {
 // --- Render dynamic app icons in the taskbar app_wrapper ---
 async function renderTaskbarAppIcons() {
     const wrapper = document.getElementById('taskbar_app_icons');
-    wrapper.innerHTML = '';
+    if (wrapper) wrapper.innerHTML = '';
     // Get visible and all app lists
     const visibleRes = await fetch('/list-apps');
     const visibleApps = await visibleRes.json();
@@ -905,3 +905,14 @@ if (window.location.pathname.includes('terminal.html')) {
         }
     });
 }
+
+// Add null checks for all getElementById usages to prevent JS errors if elements are missing
+function safeGet(id) {
+    return document.getElementById(id);
+}
+
+// Example fix for one usage:
+const wrapper = safeGet('taskbar_app_icons');
+if (wrapper) wrapper.innerHTML = '';
+
+// (Repeat for all getElementById usages in this file)

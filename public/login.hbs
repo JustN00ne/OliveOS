@@ -26,7 +26,7 @@
 
     <div class="login_screen_b2" style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:1000;pointer-events:none;opacity:0;transition:opacity 0.3s;">
 
-        <form class="inner_container_top login_new" id="login_screen_form" method="POST" action="/api/login" style="display: none;"> 
+        <form class="inner_container_top login_new" id="login_screen_form" method="POST" action="/api/auth/login" style="display: none;"> 
             <div class="inner_c_wr">
             <h1 class="login_title">Add a new account</h1>
             <p class="login_subtitle">Log in to your account</p>
@@ -37,7 +37,7 @@
     
     </div>
 
-        <form class="inner_container_top register_new" id="register_screen_form" method="POST" action="/api/register" style="display: none;">
+        <form class="inner_container_top register_new" id="register_screen_form" method="POST" action="/api/auth/register" style="display: none;">
             <div class="inner_c_wr">
             <h1 class="login_title">Create an account</h1>
             <p class="login_subtitle">Register a new account</p>
@@ -343,7 +343,7 @@
         e.preventDefault();
         const email = document.getElementById('login_email').value;
         const password = document.getElementById('login_password').value;
-        const res = await fetch('/api/login', {
+        const res = await fetch('/api/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -359,7 +359,8 @@
             }
             window.location.href = '/';
         } else {
-            const data = await res.json();
+            let data;
+            try { data = await res.json(); } catch { data = { error: 'Unknown error' }; }
             console.error('Login failed:', data.error);
             alert('Login failed: ' + data.error);
         }
@@ -370,7 +371,7 @@
         e.preventDefault();
         const email = document.getElementById('register_email').value;
         const password = document.getElementById('register_password').value;
-        const res = await fetch('/api/register', {
+        const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password })
@@ -384,7 +385,8 @@
             }
             window.location.href = '/';
         } else {
-            const data = await res.json();
+            let data;
+            try { data = await res.json(); } catch { data = { error: 'Unknown error' }; }
             alert('Registration failed: ' + data.error);
         }
     });
