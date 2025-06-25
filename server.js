@@ -65,7 +65,7 @@ if (!globalData.background_image_main) {
 app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
-        "script-src 'self' https://cdn.jsdelivr.net; default-src 'self' blob:;"
+        "default-src 'self' blob:; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src *;"
     );
     next();
 });
