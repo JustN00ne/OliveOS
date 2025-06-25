@@ -22,8 +22,8 @@
     <script>
       // 2. Initialize the client using the keys passed from the server in your /login route
       // These triple-braces {{{...}}} are important for Handlebars to not escape the quotes.
-      const supabaseUrl = '{{{supabaseUrl}}}';
-      const supabaseAnonKey = '{{{supabaseAnonKey}}}';
+    const supabaseUrl = window.SUPABASE_CONFIG.url;
+    const supabaseAnonKey = window.SUPABASE_CONFIG.anonKey;
       const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
       // 3. This listener is the magic. It fires when it sees a token in the URL hash.

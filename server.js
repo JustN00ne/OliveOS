@@ -76,7 +76,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-app.engine('hbs', exphbs.engine({ extname: '.hbs', defaultLayout: false }));
+// Replace the old app.engine line with this new, more explicit configuration
+app.engine('hbs', exphbs.engine({
+    extname: '.hbs',
+    defaultLayout: false,
+    runtimeOptions: {
+        allowProtoPropertiesByDefault: true,
+        allowProtoMethodsByDefault: true,
+    },
+}));
 app.set('view engine', 'hbs');
 app.set('views', path.join(__dirname, 'public'));
 
@@ -94,24 +102,46 @@ app.get('/', requireSupabaseAuth, (req, res) => {
 
 // New, self-contained /login route
 app.get('/login', (req, res) => {
-    // WE ARE NOT READING ANY FILES. WE ARE HARDCODING EVERYTHING.
-    // This eliminates all variables except the code itself.
-    const context = {
-        // This is the value from your data.json, corrected.
-        background_image_main: "/assets/image/default/bg.jpg", 
-        // Add the required Supabase keys for the client-side script.
-        supabaseUrl: process.env.SUPABASE_URL,
-        supabaseAnonKey: process.env.SUPABASE_ANON_KEY
-    };
+    // --- THIS ROUTE MANUALLY RENDERS THE LOGIN PAGE, BYPASSING THE BUGGY LIBRARY ---
 
-    // Log exactly what we are sending to the template, for absolute certainty.
-    console.log("Rendering /login with context:", JSON.stringify(context, null, 2));
+    const loginTemplatePath = path.join(__dirname, 'public', 'login.hbs');
+    const dataPath = path.join(__dirname, 'data', 'default', 'data.json');
 
     try {
-        res.render('login', context);
+        // 1. Read the login template as a plain text file.
+        let html = fs.readFileSync(loginTemplatePath, 'utf-8');
+
+        // 2. Load the background image URL from data.json.
+        let bg_image = '/assets/image/default/bg.jpg'; // A safe default
+        if (fs.existsSync(dataPath)) {
+            const jsonData = JSON.parse(fs.readFileSync(dataPath, 'utf-8'));
+            if (jsonData.background_image_main) {
+                // Correct the path if it contains /public
+                bg_image = jsonData.background_image_main.replace('/public', '');
+            }
+        }
+
+        // 3. Manually replace the placeholder in the HTML text.
+        html = html.replace('{{background_image_main}}', bg_image);
+
+        // 4. Manually inject the Supabase keys for the client-side script.
+        const supabaseKeysScript = `
+        <script>
+            window.SUPABASE_CONFIG = {
+                url: "${process.env.SUPABASE_URL}",
+                anonKey: "${process.env.SUPABASE_ANON_KEY}"
+            };
+        </script>
+        `;
+        html = html.replace('</head>', `${supabaseKeysScript}</head>`);
+
+        // 5. Send the final HTML to the browser.
+        res.setHeader('Content-Type', 'text/html');
+        res.status(200).send(html);
+
     } catch (e) {
-        console.error("CRITICAL: Handlebars render crashed!", e);
-        res.status(500).send("Template rendering failed. Check server logs.");
+        console.error("CRITICAL ERROR building login page:", e);
+        res.status(500).send('Server error: Could not build login page.');
     }
 });
 

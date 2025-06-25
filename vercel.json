@@ -22,7 +22,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; default-src 'self' blob:; connect-src *;"
+          "value": "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline'; default-src 'self' blob:; connect-src *;"
         }
       ]
     }
