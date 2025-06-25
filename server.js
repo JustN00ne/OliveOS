@@ -39,13 +39,22 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// A safer way to load globalData that won't crash on Vercel
 let globalData = {};
 const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
-try {
-  globalData = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
-  Log('[Server]', 'Loaded global data for templates.');
-} catch (err) {
-  Log('[Server]', 'Could not load global data: ' + err.message, 'warning');
+
+// Check if the file exists BEFORE trying to read it.
+if (fs.existsSync(globalDataPath)) {
+    try {
+        globalData = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
+        Log('[Server]', 'Successfully loaded global data from data.json.');
+    } catch (err) {
+        Log('[Server]', 'Error parsing data.json: ' + err.message, 'warning');
+        globalData = {}; // Default to empty object on parse error
+    }
+} else {
+    Log('[Server]', 'data.json not found at ' + globalDataPath + '. Using empty globalData.', 'warning');
+    globalData = {}; // Default to empty object if file doesn't exist
 }
 
 app.use((req, res, next) => {
