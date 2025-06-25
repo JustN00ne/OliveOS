@@ -326,19 +326,38 @@
       window.SUPABASE_URL = '{{SUPABASE_URL}}';
       window.SUPABASE_ANON_KEY = '{{SUPABASE_ANON_KEY}}';
     </script>
-    <script type="module">
-      import { supabase } from '/assets/js/supabaseClient.js';
-      // Listen for OAuth sign-in
-      supabase.auth.onAuthStateChange(async (event, session) => {
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+      // 2. Initialize the client using the keys passed from the server in your /login route
+      // These triple-braces {{{...}}} are important for Handlebars to not escape the quotes.
+      const supabaseUrl = '{{{supabaseUrl}}}';
+      const supabaseAnonKey = '{{{supabaseAnonKey}}}';
+      const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+      // 3. This listener is the magic. It fires when it sees a token in the URL hash.
+      supabase.auth.onAuthStateChange((event, session) => {
+        // Check if the event is a successful sign-in from an OAuth provider
         if (event === 'SIGNED_IN' && session) {
-          // Send session to backend to set cookie
-          await fetch('/api/auth/set-session', {
+          // 4. Send the session to our backend endpoint to set the secure httpOnly cookie
+          fetch('/api/auth/set-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session })
+            body: JSON.stringify({ session: session }),
+          })
+          .then(res => {
+            if (res.ok) {
+              // 5. Success! The server now has the cookie. We can safely redirect to the main app.
+              console.log('Session cookie set successfully. Redirecting to /');
+              window.location.href = '/';
+            } else {
+              console.error('Error: Failed to set the session cookie on the server.');
+              alert('Login failed. Could not set server session.');
+            }
+          })
+          .catch(err => {
+              console.error('Fetch error:', err);
+              alert('Login failed due to a network error.');
           });
-          // Redirect to home
-          window.location.href = '/';
         }
       });
     </script>
