@@ -76,11 +76,8 @@ app.use((req, res, next) => {
 
 // --- Auth Router ---
 const { router: authRouter, requireSupabaseAuth } = require('./api/auth');
-app.use('/api', authRouter);
-
-// --- Register Router ---
-const registerRouter = require('./api/register');
-app.use('/api/register', registerRouter);
+// Mount all auth-related routes (/login, /logout, /register) under /api/auth
+app.use('/api/auth', authRouter);
 
 // --- Home Route (Protected) ---
 app.get('/', requireSupabaseAuth, (req, res) => {
@@ -528,6 +525,23 @@ app.get('/api/whoami', (req, res) => {
   // For now, return a dummy user object or 401 if not logged in
   // You can add real auth logic here later
   res.json({ user: { id: 'demo', name: 'Demo User' } });
+});
+
+// --- OAuth Redirects for Google/Discord (for backward compatibility) ---
+app.get('/api/register/google', (req, res) => {
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const appUrl = `${protocol}://${host}`;
+  const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(appUrl)}`;
+  res.redirect(providerUrl);
+});
+
+app.get('/api/register/discord', (req, res) => {
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  const appUrl = `${protocol}://${host}`;
+  const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(appUrl)}`;
+  res.redirect(providerUrl);
 });
 
 server.listen(PORT, () => {
