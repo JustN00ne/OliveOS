@@ -2,15 +2,22 @@
   "version": 2,
   "builds": [
     {
+      "src": "public/**/*",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "data/**/*",
+      "use": "@vercel/static"
+    },
+    {
       "src": "server.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": [
-          "public/**",
-          "data/**",
-          "api/**"
-        ]
-      }
+      "use": "@vercel/node"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/server.js"
     }
   ],
   "headers": [
@@ -22,12 +29,6 @@
           "value": "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; default-src 'self' blob:; connect-src *;"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/server.js"
     }
   ]
 }

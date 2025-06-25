@@ -43,18 +43,21 @@ const PORT = process.env.PORT || 3000;
 let globalData = {};
 const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
 
-// Check if the file exists BEFORE trying to read it.
-if (fs.existsSync(globalDataPath)) {
-    try {
-        globalData = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
-        Log('[Server]', 'Successfully loaded global data from data.json.');
-    } catch (err) {
-        Log('[Server]', 'Error parsing data.json: ' + err.message, 'warning');
-        globalData = {}; // Default to empty object on parse error
-    }
-} else {
-    Log('[Server]', 'data.json not found at ' + globalDataPath + '. Using empty globalData.', 'warning');
-    globalData = {}; // Default to empty object if file doesn't exist
+try {
+  // Try to read and parse the file
+  const fileContent = fs.readFileSync(globalDataPath, 'utf-8');
+  globalData = JSON.parse(fileContent);
+  Log('[Server]', 'Successfully loaded global data from data.json.');
+} catch (err) {
+  // If ANY error occurs (file not found, bad JSON), log it and set a safe default.
+  Log('[Server]', 'Could not load or parse data.json: ' + err.message, 'warning');
+  globalData = {}; // Start with an empty object
+}
+
+// Ensure required variables have a fallback value to prevent template crashes.
+if (!globalData.background_image_main) {
+  globalData.background_image_main = '/assets/image/bg/default.jpg'; // Provide a safe default
+  Log('[Server]', 'globalData.background_image_main was missing. Using default.', 'warning');
 }
 
 app.use((req, res, next) => {
