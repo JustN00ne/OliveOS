@@ -13,16 +13,21 @@
       }
     }
   ],
-  "routes": [
+  "headers": [
     {
-      "headers": {
-        "Content-Security-Policy": "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; default-src 'self' blob:; connect-src *;"
-      },
-      "continue": true
-    },
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; default-src 'self' blob:; connect-src *;"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/server.js"
+      "source": "/(.*)",
+      "destination": "/server.js"
     }
   ]
 }
