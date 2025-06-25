@@ -39,9 +39,11 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
+// New, simpler top-level line
+const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
+
 // A safer way to load globalData that won't crash on Vercel
 let globalData = {};
-const globalDataPath = path.join(__dirname, 'data', 'default', 'data.json');
 
 try {
   // Try to read and parse the file
@@ -90,16 +92,31 @@ app.get('/', requireSupabaseAuth, (req, res) => {
   res.render('index', { ...globalData, user: req.supabaseUser });
 });
 
+// New, self-contained /login route
 app.get('/login', (req, res) => {
-  const context = { ...globalData };
+  let context = {}; // Start with a fresh context for this request
+
+  try {
+    if (fs.existsSync(globalDataPath)) {
+      context = JSON.parse(fs.readFileSync(globalDataPath, 'utf-8'));
+      Log('[Login Route]', 'Successfully loaded data.json for login page.');
+    }
+  } catch (err) {
+    Log('[Login Route]', 'Error loading or parsing data.json: ' + err.message, 'warning');
+    context = {}; // On error, ensure context is an empty object
+  }
+
+  // Add Supabase keys to the context
   context.supabaseUrl = process.env.SUPABASE_URL;
   context.supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
+  // SAFETY NET: If the specific key is STILL missing, add a default
   if (!context.background_image_main) {
-    Log('[Server]', 'background_image_main is missing. Using fallback.', 'warning');
-    context.background_image_main = '/assets/image/default/bg.jpg'; 
+    Log('[Login Route]', 'background_image_main missing, providing default.', 'warning');
+    context.background_image_main = '/assets/image/default/bg.jpg';
   }
 
+  // Render the template with the guaranteed-to-be-correct context
   res.render('login', context);
 });
 
