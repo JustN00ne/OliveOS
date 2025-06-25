@@ -2,7 +2,7 @@
 require('dotenv').config(); // Load .env for Supabase keys
 const express = require('express');
 const http = require('http');
-const path = ('path');
+const path = require('path'); // <<< THIS IS THE FIX. It should require the 'path' module.
 const exphbs = require('express-handlebars');
 const cookieParser = require('cookie-parser');
 
@@ -10,14 +10,13 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 
-// --- FIX #1: CHECK FOR MISSING ENVIRONMENT VARIABLES ---
+// --- CHECK FOR MISSING ENVIRONMENT VARIABLES ---
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
     console.error('FATAL ERROR: SUPABASE_URL and SUPABASE_ANON_KEY must be set in your .env file.');
     process.exit(1); // Stop the server if keys are missing
 }
 
-// --- FIX #2: SET A PROPER CONTENT SECURITY POLICY (CSP) ---
-// This middleware will apply a new CSP to all responses, allowing scripts to be loaded.
+// --- SET A PROPER CONTENT SECURITY POLICY (CSP) ---
 app.use((req, res, next) => {
     res.setHeader(
         'Content-Security-Policy',
@@ -26,7 +25,6 @@ app.use((req, res, next) => {
     );
     next();
 });
-
 
 // Keep the rest of your existing server configuration
 app.use(express.static(path.join(__dirname, 'public')));
@@ -57,7 +55,6 @@ app.get('/login', (req, res) => {
   });
 });
 
-
 // OAuth Redirects (keep these as they are)
 app.get('/api/register/google', (req, res) => {
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
@@ -74,7 +71,6 @@ app.get('/api/register/discord', (req, res) => {
   const providerUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/authorize?provider=discord&redirect_to=${encodeURIComponent(appUrl)}`;
   res.redirect(providerUrl);
 });
-
 
 server.listen(PORT, () => {
   console.log(`[Server] Listening on port ${PORT}`);
