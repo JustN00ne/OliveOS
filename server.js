@@ -190,4 +190,4 @@ app.get('/api/register/discord', (req, res) => {
 
 server.listen(PORT, () => {
   Log('[Server]', `🚀 Server is running and listening on http://localhost:${PORT}`);
-});s
+});
