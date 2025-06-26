@@ -19,6 +19,8 @@
     <meta name="author" content="JustNoone">
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+
     <script>
       // 2. Initialize the client using the keys passed from the server in your /login route
       // These triple-braces {{{...}}} are important for Handlebars to not escape the quotes.
@@ -77,6 +79,7 @@
             <h1 class="login_title">Create an account</h1>
             <p class="login_subtitle">Register a new account</p>
             <input type="text" name="reg_email" id="register_email" class="login_input" placeholder="Email" autocomplete="email">
+            <input type="text" name="reg_name" id="register_name" class="login_input" placeholder="Username" autocomplete="username">
             <input type="password" name="reg_password" id="register_password" class="login_input" placeholder="Password" autocomplete="new-password">
             <button class="login_button" id="register_button" type="submit">Register</button>
             <div class="divider_signin"></div>
@@ -132,7 +135,7 @@
             <span id="time_currently" class="hb time">12:34:56</span>
         </div>
         <div class="right_s">
-            <div id="user_info_section" style="display:none; flex-direction: row; align-items: flex-end; gap: 20px;">
+            <div id="user_info_section" style="display: flex; flex-direction: row-reverse; align-items: flex-end; gap: 20px;">
                 <div class="login_rs">
                     <img id="user_profile_img" src="" alt="pfp" class="login_logo">
                 </div>
@@ -143,6 +146,8 @@
             </div>
         </div>
     </div>
+
+    <div id="login_error_notification" class="login-error-notification"></div>
 
     <script>
         const loginScreen = document.getElementById('login_screen_m');
@@ -267,6 +272,22 @@
         }
     </script>
     <script>
+    function showLoginError(message, inputIds = []) {
+      const notif = document.getElementById('login_error_notification');
+      if (notif) {
+        notif.textContent = message;
+        notif.classList.add('show');
+        setTimeout(() => notif.classList.remove('show'), 3500);
+      }
+      inputIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.add('input-error');
+          setTimeout(() => el.classList.remove('input-error'), 2000);
+        }
+      });
+    }
+
     document.getElementById('login_screen_form').addEventListener('submit', async function(e) {
         e.preventDefault();
         const email = document.getElementById('login_email').value;
@@ -291,8 +312,7 @@
         } else {
             let data;
             try { data = await res.json(); } catch { data = { error: 'Unknown error' }; }
-            console.error('Login failed:', data.error);
-            alert('Login failed: ' + data.error);
+            showLoginError('Login failed: ' + (data.error || 'Unknown error'), ['login_email', 'login_password']);
         }
     });
 
@@ -300,12 +320,11 @@
         e.preventDefault();
         const email = document.getElementById('register_email').value;
         const password = document.getElementById('register_password').value;
-        
-        // This fetch URL MUST match the server route
+        const name = document.getElementById('register_name').value;
         const res = await fetch('/api/auth/register', { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ email, password, name })
         });
         if (res.ok) {
             let data = {};
@@ -314,13 +333,17 @@
                 localStorage.setItem('supabase_registered', 'true');
                 if (data.user) {
                     localStorage.setItem('supabase_user_email', data.user.email || email);
+                    localStorage.setItem('supabase_user_name', data.user.name || name);
+                } else {
+                    // fallback if user object is missing
+                    localStorage.setItem('supabase_user_name', name);
                 }
             }
             window.location.href = '/';
         } else {
             let data;
             try { data = await res.json(); } catch { data = { error: 'Unknown error' }; }
-            alert('Registration failed: ' + data.error);
+            showLoginError('Registration failed: ' + (data.error || 'Unknown error'), ['register_email', 'register_password', 'register_name']);
         }
     });
 
