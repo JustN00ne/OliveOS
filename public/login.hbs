@@ -156,7 +156,14 @@
         const registerForm = document.getElementById('register_screen_form');
         const makeAccountBtn = document.getElementById('make_account_btn');
         const changeAccountsBtn = document.getElementById('change_accounts_btn');
-        
+        const backgroundContainer = document.querySelector('.background_container');
+        const backgroundImg = document.getElementById('background_img_main');
+        // Set background image at scale 1 by default
+        if (backgroundImg) {
+            backgroundImg.style.transform = 'scale(1)';
+            backgroundImg.style.transition = 'transform 0.4s cubic-bezier(0.4,0,0.2,1)';
+        }
+
         if (loginScreenB2) loginScreenB2.style.opacity = 0;
         if (loginForm) loginForm.style.display = 'flex';
         if (registerForm) registerForm.style.display = 'none';
@@ -206,6 +213,9 @@
                 loginScreen.style.transition = 'transform 0.4s ease-in-out, opacity 0.4s ease-in-out';
                 loginScreen.style.transform = `translateY(-${maxDragDistance}px)`;
                 loginScreen.style.opacity = 0;
+                if (backgroundImg) {
+                    backgroundImg.style.transform = 'scale(1.2)';
+                }
                 if (loginScreenB2) {
                     loginScreenB2.style.display = 'block';
                     loginScreenB2.style.pointerEvents = 'auto';
@@ -230,6 +240,11 @@
             const dragProgress = -currentTranslateY / maxDragDistance;
             loginScreen.style.transform = `translateY(${currentTranslateY}px)`;
             loginScreen.style.opacity = 1 - dragProgress;
+            if (backgroundImg) {
+                // Only scale, no translate/parallax
+                const scale = 1 + dragProgress * 0.2; // scale from 1 to 1.2
+                backgroundImg.style.transform = `scale(${scale})`;
+            }
             if (loginScreenB2) {
                 if (dragProgress >= 0.45) {
                     loginScreenB2.style.display = 'block';
@@ -253,6 +268,9 @@
         function snapUp() {
             loginScreen.style.transform = `translateY(-${maxDragDistance}px)`;
             loginScreen.style.opacity = 0; isDragging = false;
+            if (backgroundImg) {
+                backgroundImg.style.transform = 'scale(1.2)';
+            }
             if (loginScreenB2) {
                 loginScreenB2.style.display = 'block';
                 loginScreenB2.style.pointerEvents = 'auto';
@@ -264,6 +282,9 @@
         function snapDown() {
             loginScreen.style.transform = 'translateY(0px)';
             loginScreen.style.opacity = 1;
+            if (backgroundImg) {
+                backgroundImg.style.transform = 'scale(1)';
+            }
             if (loginScreenB2) {
                 loginScreenB2.style.pointerEvents = 'none';
                 loginScreenB2.style.opacity = 0;
@@ -303,7 +324,16 @@
             if (data && (data.user || data.success)) {
                 localStorage.setItem('supabase_registered', 'true');
                 if (data.user) {
-                    localStorage.setItem('supabase_user_profile', data.user.profile_url || '');
+                    // Try to get profile picture from user_metadata or identities
+                    let profileUrl = '';
+                    if (data.user.user_metadata && data.user.user_metadata.avatar_url) {
+                        profileUrl = data.user.user_metadata.avatar_url;
+                    } else if (data.user.identities && data.user.identities.length > 0 && data.user.identities[0].identity_data && data.user.identities[0].identity_data.avatar_url) {
+                        profileUrl = data.user.identities[0].identity_data.avatar_url;
+                    } else if (data.user.profile_url) {
+                        profileUrl = data.user.profile_url;
+                    }
+                    localStorage.setItem('supabase_user_profile', profileUrl || '/assets/image/default/pfp.png');
                     localStorage.setItem('supabase_user_name', data.user.name || '');
                     localStorage.setItem('supabase_user_email', data.user.email || email);
                 }
@@ -332,6 +362,16 @@
             if (data && (data.user || data.success)) {
                 localStorage.setItem('supabase_registered', 'true');
                 if (data.user) {
+                    // Try to get profile picture from user_metadata or identities
+                    let profileUrl = '';
+                    if (data.user.user_metadata && data.user.user_metadata.avatar_url) {
+                        profileUrl = data.user.user_metadata.avatar_url;
+                    } else if (data.user.identities && data.user.identities.length > 0 && data.user.identities[0].identity_data && data.user.identities[0].identity_data.avatar_url) {
+                        profileUrl = data.user.identities[0].identity_data.avatar_url;
+                    } else if (data.user.profile_url) {
+                        profileUrl = data.user.profile_url;
+                    }
+                    localStorage.setItem('supabase_user_profile', profileUrl || '/assets/image/default/pfp.png');
                     localStorage.setItem('supabase_user_email', data.user.email || email);
                     localStorage.setItem('supabase_user_name', data.user.name || name);
                 } else {

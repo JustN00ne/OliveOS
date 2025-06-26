@@ -521,29 +521,7 @@ function makeWindowDraggable(win, setUserSelectNone) {
     }
 }
 
-// --- Fix window rescaling (remove scale/rounded effect on resize/minimize) ---
-// Remove 'scale' property from .app_window.show-app and .app_window.minimized in taskbar.css
-
-function createTaskbarIcon(app) {
-    const icon = document.createElement('div');
-    icon.className = 'taskbar-app-icon';
-    icon.innerHTML = `<i data-lucide="${app.icon}"></i>`;
-    icon.title = app.name;
-    icon.onclick = () => focusApp(app.id);
-    icon.onwheel = (e) => {
-        if (openApps.length > 1) {
-            focusedAppIndex = (focusedAppIndex + (e.deltaY > 0 ? 1 : -1) + openApps.length) % openApps.length;
-            focusApp(openApps[focusedAppIndex].id);
-        }
-    };
-    icon.onmouseenter = () => {
-        if (openApps.length > 1) icon.classList.add('hovered');
-    };
-    icon.onmouseleave = () => icon.classList.remove('hovered');
-    return icon;
-}
-
-function openApp(appId) {
+async function openApp(appId) {
     if (openApps.find(a => a.id === appId)) {
         focusApp(appId);
         return;
@@ -551,24 +529,34 @@ function openApp(appId) {
     const app = appTemplates.find(a => a.id === appId);
     if (!app) return;
     const win = createAppWindow(app);
-    document.getElementById('app_windows_container').appendChild(win);
+    const container = document.getElementById('app_windows_container');
+    if (container) {
+      container.appendChild(win);
+    }
     openApps.push(app);
     focusedAppIndex = openApps.length - 1;
     win.classList.remove('hidden');
     focusApp(appId);
     // Set document title to app name
     if (app.name) document.title = app.name;
+    // --- FIX: Re-render taskbar to show the new open app icon ---
+    await renderTaskbarAppIcons();
 }
 
-function closeApp(appId) {
+async function closeApp(appId) {
     const win = document.getElementById(appId);
     if (win) win.remove(); // Remove from DOM
     openApps = openApps.filter(a => a.id !== appId);
     // Optionally, focus another open app if any
     const stillOpen = Array.from(document.querySelectorAll('.app_window:not(.hidden)'));
-    if (stillOpen.length) {
-        focusApp(stillOpen[stillOpen.length - 1].id);
+    if (stillOpen.length > 0) {
+        const lastOpenApp = stillOpen[stillOpen.length - 1];
+        if (lastOpenApp) {
+          focusApp(lastOpenApp.id);
+        }
     }
+    // --- FIX: Re-render taskbar to hide the closed app icon ---
+    await renderTaskbarAppIcons();
 }
 
 function minimizeApp(appId) {
@@ -593,33 +581,29 @@ function focusApp(appId) {
         win.classList.remove('minimized');
         win.style.display = '';
         win.style.zIndex = maxZ + 1;
+        // Focus management
+        document.querySelectorAll('.app_window.focused').forEach(w => w.classList.remove('focused'));
         win.classList.add('focused');
-        document.querySelectorAll('.app_window').forEach(w => {
-            if (w.id !== appId) w.classList.remove('focused');
-        });
     }
     // Highlight taskbar icon
-    document.querySelectorAll('.taskbar-app-icon').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.taskbar-app-icon.active').forEach(i => i.classList.remove('active'));
     const icon = document.getElementById('taskbar_icon_' + appId);
     if (icon) icon.classList.add('active');
     // Update focusedAppIndex
     focusedAppIndex = openApps.findIndex(a => a.id === appId);
 }
 
+
 // Bring to front on click anywhere in window
 function setupWindowFocusOnClick() {
-    document.getElementById('app_windows_container').addEventListener('mousedown', e => {
-        let win = e.target.closest('.app_window');
-        if (win) focusApp(win.id);
-    });
+    const container = document.getElementById('app_windows_container');
+    if (container) {
+      container.addEventListener('mousedown', e => {
+          let win = e.target.closest('.app_window');
+          if (win) focusApp(win.id);
+      });
+    }
 }
-
-// Remove the setupAppLauncher function so the menu icon does nothing
-// function setupAppLauncher() {
-//     document.getElementById('app_launcher_btn').onclick = () => {
-//         openApp('olive.settings.ox');
-//     };
-// }
 
 // Add back the setupAppScaling function to avoid ReferenceError
 function setupAppScaling() {
@@ -627,16 +611,13 @@ function setupAppScaling() {
 }
 
 // --- Dynamic App Loader for OliveOS ---
-// Scans data/applicaton/* for @manifest.oman and loads apps dynamically
 async function loadDynamicApps() {
-    // Helper to parse .oman files (very basic INI parser)
     function parseOman(text) {
         const result = {};
         let section = null;
         text.split(/\r?\n/).forEach(line => {
             line = line.trim();
             if (!line || line.startsWith('#') || line.startsWith('//')) return;
-            // Remove inline comments after #
             if (line.includes('#')) line = line.split('#')[0].trim();
             if (!line) return;
             if (line.startsWith('@#[')) {
@@ -646,21 +627,19 @@ async function loadDynamicApps() {
             }
             if (section && line.includes('=')) {
                 let [k, v] = line.split('=').map(s => s.trim());
-                // Remove quotes if present
                 if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-                // Parse booleans for invisible
-                if (k === 'invisible') {
-                    v = (v === 'true' || v === '1');
-                }
+                if (k === 'invisible') v = (v === 'true' || v === '1');
                 result[section][k] = v;
             }
         });
         return result;
     }
-    // Find all app folders
     const appRoot = 'data/applicaton';
-    // Fetch all apps, including invisible, so they can be opened directly
-    const res = await fetch('/list-apps?all=true'); // Custom endpoint to list app folders
+    const res = await fetch('/list-apps?all=true');
+    if (!res.ok) {
+        console.error("Failed to load app list from server.");
+        return;
+    }
     const appFolders = await res.json();
     for (const folder of appFolders) {
         try {
@@ -668,35 +647,22 @@ async function loadDynamicApps() {
             if (!manifestRes.ok) continue;
             const manifestText = await manifestRes.text();
             const manifest = parseOman(manifestText);
-            // --- Use manifest for all app info ---
-            // Get app id and display name
             const appId = manifest.app?.id || folder;
             const appName = manifest.app?.name || folder;
-            // Icon path (relative to app folder)
-            let appIcon = undefined;
+            let appIcon = `/${appRoot}/${folder}/source/assets/icon.png`;
             if (manifest.app?.icon) {
-                // If icon starts with /, treat as relative to app folder
                 appIcon = `/${appRoot}/${folder}${manifest.app.icon.startsWith('/') ? manifest.app.icon : '/' + manifest.app.icon}`;
-            } else {
-                // Fallback: try /source/assets/icon.png
-                appIcon = `/${appRoot}/${folder}/source/assets/icon.png`;
             }
-            // Working directory (where @app.oman is)
-            let workingDir = manifest.runtime?.working_directory || '/source/app/';
-            workingDir = workingDir.trim().replace(/\\/g, '/').replace(/\s+/g, '');
-            if (workingDir.endsWith('/')) workingDir = workingDir.slice(0, -1);
-            // Read @app.oman from working_directory
-            let appOman = {};
+            let workingDir = (manifest.runtime?.working_directory || '/source/app/').trim().replace(/\\/g, '/').replace(/\s+/g, '').replace(/\/$/, '');
             let htmlFile = 'index.html';
             try {
                 const appOmanRes = await fetch(`/${appRoot}/${folder}${workingDir}/@app.oman`);
                 if (appOmanRes.ok) {
                     const appOmanText = await appOmanRes.text();
-                    appOman = parseOman(appOmanText);
-                    // Find the first .html file in sources
+                    const appOman = parseOman(appOmanText);
                     if (appOman.sources) {
                         for (const key in appOman.sources) {
-                            if (appOman.sources[key] && appOman.sources[key].endsWith('.html')) {
+                            if (appOman.sources[key]?.endsWith('.html')) {
                                 htmlFile = appOman.sources[key].replace(/^\//, '');
                                 break;
                             }
@@ -704,42 +670,25 @@ async function loadDynamicApps() {
                     }
                 }
             } catch {}
-            // Compose iframe path
-            let iframePath = `/${appRoot}/${folder}${workingDir ? `/${workingDir}` : ''}/${htmlFile}`;
-            iframePath = iframePath.replace(/\\/g, '/').replace(/\s+/g, '');
-            iframePath = iframePath.replace(/([^:])\/+/g, '$1/');
-            // UI config
+            let iframePath = `/${appRoot}/${folder}${workingDir ? `/${workingDir}` : ''}/${htmlFile}`.replace(/\\/g, '/').replace(/\s+/g, '').replace(/([^:])\/+/g, '$1/');
             const ui = manifest.ui || {};
-            let width = ui.width ? (isNaN(Number(ui.width)) ? ui.width : parseInt(ui.width)) : 700;
-            let height = ui.height ? (isNaN(Number(ui.height)) ? ui.height : parseInt(ui.height)) : 400;
-            let minWidth = ui.min_width ? (isNaN(Number(ui.min_width)) ? ui.min_width : parseInt(ui.min_width)) : 320;
-            let minHeight = ui.min_height ? (isNaN(Number(ui.min_height)) ? ui.min_height : parseInt(ui.min_height)) : 200;
-            let maxWidth = ui.max_width ? (isNaN(Number(ui.max_width)) ? ui.max_width : parseInt(ui.max_width)) : null;
-            let maxHeight = ui.max_height ? (isNaN(Number(ui.max_height)) ? ui.max_height : parseInt(ui.max_height)) : null;
-            let resizable = ui.resizable !== undefined ? (ui.resizable === 'true' || ui.resizable === true) : true;
-            let fullscreen = ui.fullscreen !== undefined ? (ui.fullscreen === 'true' || ui.fullscreen === true) : false;
-            let type = ui.type || 'windowed';
-            let invisible = false;
-            if (typeof ui.invisible !== 'undefined') {
-                invisible = ui.invisible === true;
-            }
-            // Register app in appTemplates
             appTemplates.push({
                 id: appId,
+                folder: folder, // Store original folder name for visibility checks
                 name: appName,
                 icon: appIcon,
                 iframe: iframePath,
-                width,
-                height,
-                minWidth,
-                minHeight,
-                maxWidth,
-                maxHeight,
-                resizable,
-                fullscreen,
-                type,
-                invisible,
-                iconFallback: '/assets/image/default/fav/logo.svg' // <-- ADD THIS LINE
+                width: ui.width ? (isNaN(Number(ui.width)) ? ui.width : parseInt(ui.width)) : 700,
+                height: ui.height ? (isNaN(Number(ui.height)) ? ui.height : parseInt(ui.height)) : 400,
+                minWidth: ui.min_width ? (isNaN(Number(ui.min_width)) ? ui.min_width : parseInt(ui.min_width)) : 320,
+                minHeight: ui.min_height ? (isNaN(Number(ui.min_height)) ? ui.min_height : parseInt(ui.min_height)) : 200,
+                maxWidth: ui.max_width ? (isNaN(Number(ui.max_width)) ? ui.max_width : parseInt(ui.max_width)) : null,
+                maxHeight: ui.max_height ? (isNaN(Number(ui.max_height)) ? ui.max_height : parseInt(ui.max_height)) : null,
+                resizable: ui.resizable !== 'false',
+                fullscreen: ui.fullscreen === 'true',
+                type: ui.type || 'windowed',
+                invisible: ui.invisible === true,
+                iconFallback: '/assets/image/default/fav/logo.svg'
             });
         } catch (e) { console.warn('Failed to load app', folder, e); }
     }
@@ -748,171 +697,149 @@ async function loadDynamicApps() {
 // --- Render dynamic app icons in the taskbar app_wrapper ---
 async function renderTaskbarAppIcons() {
     const wrapper = document.getElementById('taskbar_app_icons');
-    if (wrapper) wrapper.innerHTML = '';
-    // Get visible and all app lists
-    const visibleRes = await fetch('/list-apps');
-    const visibleApps = await visibleRes.json();
-    const allRes = await fetch('/list-apps?all=true');
-    const allApps = await allRes.json();
-    // Find invisible apps (in allApps but not in visibleApps)
-    const invisibleAppIds = allApps.filter(x => !visibleApps.includes(x));
-    appTemplates.forEach(app => {
-        const isOpen = openApps.find(a => a.id === app.id);
-        if (
-            (app.fullscreen === false && app.type !== 'background') &&
-            (!app.invisible || isOpen)
-        ) {
-            const icon = document.createElement('div');
-            icon.className = 'taskbar-app-icon fade-hover';
-            // If app is invisible (not in visibleApps), add app_invisible class
-            if (invisibleAppIds.includes(app.id) && !isOpen) {
-                icon.classList.add('app_invisible');
-            }
-            if (app.icon && app.icon.endsWith('.png')) {
-                // We already defined iconFallback in loadDynamicApps, so this will now work correctly.
-                // The path itself within app.iconFallback is already correct from the change above.
-                icon.innerHTML = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${app.iconFallback}'" class="fade-icon" />`;
-            } else {
-                icon.innerHTML = `<i data-lucide="${app.icon || 'globe'}"></i>`;
-            }
-            icon.title = app.name;
-            icon.id = 'taskbar_icon_' + app.id;
-            icon.onclick = () => openApp(app.id);
-            if (isOpen) {
-                icon.classList.add('open-indicator');
-            }
-            wrapper.appendChild(icon);
+    if (!wrapper) return;
+    wrapper.innerHTML = '';
+
+    try {
+        const [allRes, visibleRes] = await Promise.all([
+            fetch('/list-apps?all=true'),
+            fetch('/list-apps')
+        ]);
+
+        if (!allRes.ok || !visibleRes.ok) {
+            console.error("Failed to fetch app lists from server.");
+            return;
         }
-    });
-    lucide.createIcons();
+
+        const allAppFolders = await allRes.json();
+        const visibleAppFolders = await visibleRes.json();
+        const invisibleAppFolders = allAppFolders.filter(folder => !visibleAppFolders.includes(folder));
+
+        appTemplates.forEach(app => {
+            const isOpen = openApps.some(a => a.id === app.id);
+            const isInvisible = invisibleAppFolders.includes(app.folder);
+
+            // Show icon if it's a windowed app AND (it's NOT invisible OR it IS currently open)
+            if (app.type === 'windowed' && (!isInvisible || isOpen)) {
+                const icon = document.createElement('div');
+                icon.className = 'taskbar-app-icon fade-hover';
+                
+                if (app.icon?.endsWith('.png')) {
+                    icon.innerHTML = `<img src="${app.icon}" alt="${app.name}" onerror="this.onerror=null;this.src='${app.iconFallback}'" class="fade-icon" />`;
+                } else {
+                    icon.innerHTML = `<i data-lucide="${app.icon || 'globe'}"></i>`;
+                }
+                
+                icon.title = app.name;
+                icon.id = 'taskbar_icon_' + app.id;
+                icon.onclick = () => openApp(app.id);
+                
+                if (isOpen) {
+                    icon.classList.add('open-indicator');
+                    if (document.querySelector(`.app_window.focused#${app.id}`)) {
+                        icon.classList.add('active');
+                    }
+                }
+                
+                wrapper.appendChild(icon);
+            }
+        });
+
+        lucide.createIcons();
+    } catch (error) {
+        console.error("Error rendering taskbar icons:", error);
+    }
 }
+
 
 // On DOMContentLoaded, load dynamic apps then re-render launcher
 document.addEventListener('DOMContentLoaded', async () => {
     lucide.createIcons();
     animatePills();
     setupTooltips();
-    // Update time
+    
     function updateTime() {
         const now = new Date();
-        document.getElementById('time_currently').textContent = 
-            now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('date_currently').textContent = 
-            now.toLocaleDateString([], {day: '2-digit', month: '2-digit', year: 'numeric'});
+        const timeEl = document.getElementById('time_currently');
+        const dateEl = document.getElementById('date_currently');
+        if (timeEl) timeEl.textContent = now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        if (dateEl) dateEl.textContent = now.toLocaleDateString([], {day: '2-digit', month: '2-digit', year: 'numeric'});
     }
     updateTime();
     setInterval(updateTime, 60000);
+
     await loadDynamicApps();
-    renderTaskbarAppIcons();
-    // setupAppLauncher(); // <-- remove this line
+    await renderTaskbarAppIcons();
     setupAppScaling();
     setupWindowFocusOnClick();
-    // Redirect to login if not authenticated (client-side fallback)
+
     fetch('/api/whoami', { credentials: 'include' })
         .then(res => {
-            if (res.status === 401) {
-                window.location.href = '/login';
-            }
+            if (res.status === 401) window.location.href = '/login';
         })
         .catch(() => {
             window.location.href = '/login';
         });
 });
 
-// --- Simple Terminal App using Xterm.js and node-pty ---
+// --- Simple Terminal App ---
 if (window.location.pathname.includes('terminal.html')) {
     const termContainer = document.getElementById('terminal');
-    const term = new window.Terminal({
-        cursorBlink: true,
-        fontFamily: 'monospace',
-        fontSize: 16,
-        theme: { background: '#181818', foreground: '#e0e0e0' }
-    });
-    term.open(termContainer);
-    term.focus();
-    let cwd = '/';
-    let prompt = () => `olive@oliveos:${cwd}$ `;
-    let buffer = '';
-    function printPrompt() {
-        term.write('\r\n' + prompt());
-    }
-    function runCommand(cmd) {
-        const args = cmd.trim().split(/\s+/);
-        const command = args[0];
-        switch (command) {
-            case 'help':
-                term.writeln('\r\nAvailable commands: help, clear, echo, ls, cd, pwd, date, whoami, about, exit');
-                break;
-            case 'clear':
-                term.clear();
-                break;
-            case 'echo':
-                term.writeln(args.slice(1).join(' '));
-                break;
-            case 'ls':
-                term.writeln('Desktop  Documents  Downloads  Music  Pictures  Videos');
-                break;
-            case 'cd':
-                if (args[1]) {
-                    if (args[1] === '..') {
-                        cwd = cwd === '/' ? '/' : cwd.split('/').slice(0, -1).join('/') || '/';
-                    } else {
-                        cwd = cwd === '/' ? `/${args[1]}` : `${cwd}/${args[1]}`;
-                    }
-                }
-                break;
-            case 'pwd':
-                term.writeln(cwd);
-                break;
-            case 'date':
-                term.writeln(new Date().toString());
-                break;
-            case 'whoami':
-                term.writeln('olive');
-                break;
-            case 'about':
-                term.writeln('OliveOS Terminal - Simulated shell.');
-                break;
-            case 'exit':
-                term.writeln('logout');
-                setTimeout(() => window.close(), 500);
-                break;
-            case 'olive':
-                term.writeln(
-`.:^~~~!!!~~~^:.            olive@oliveos\n       :^!!!!!!!!!~^^:::^^^:         --------------------------\n    .^!!!!!!!!!!^.         .:^.      OS:      Win32\n   ^!!!!!!!!!!~.             .~:     Host:    localhost\n  ~!!!!!!!!!!~                 ~^    Kernel:  Mozilla/5.0 (Windows NT 1...\n ~!!!!!!!!~~!^                 ^~^   Uptime:  0s\n^!!!!!!!~~~~~~                 ^~~:  Packages: 42 (npm)\n!!!!!!~~~~~~~~^               ^~^^^  Shell:   simulated\n~!!~~~~~~~~~~~~~:           .^~^^^^  Resolution: 1536x864\n^!~~~~~~~~~~~~~~~~^:.....:^~~^^^^^:  DE:      OliveOS Desktop Environment\n ~!~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^   WM:      Olivindo 1.0\n  ~!~~~~~~~~~~~~~~~~~~^^^^^^^^^^^    WM Theme: Default Theme - Dark\n   ^~~~~~~~~~~~~~~~~~^^^^^^^^^^:     Terminal: OliveOS Terminal / UNIX like\n    .^~~~~~~~~~~~~^^^^^^^^^^^:       Terminal Font: Monospace\n       .^~~~~~~~~^^^^^^^^^:.         CPU:     N/A\n          ..:^^^^^^^^::.             GPU:     N/A\n                                     Memory:  N/A\n                                     Network: N/A\n\n                `);
-                break;
-            default:
-                if (command.trim() !== '')
-                    term.writeln(`${command}: command not found`);
+    if (termContainer) {
+        const term = new window.Terminal({
+            cursorBlink: true,
+            fontFamily: 'monospace',
+            fontSize: 16,
+            theme: { background: '#181818', foreground: '#e0e0e0' }
+        });
+        term.open(termContainer);
+        term.focus();
+        let cwd = '/';
+        let prompt = () => `olive@oliveos:${cwd}$ `;
+        let buffer = '';
+        function printPrompt() {
+            term.write('\r\n' + prompt());
         }
-    }
-    printPrompt();
-    term.onData(data => {
-        for (let ch of data) {
-            if (ch === '\r') {
-                runCommand(buffer);
-                buffer = '';
-                printPrompt();
-            } else if (ch === '\u007F') { // Backspace
-                if (buffer.length > 0) {
-                    buffer = buffer.slice(0, -1);
-                    term.write('\b \b');
-                }
-            } else if (ch >= ' ' && ch <= '~') {
-                buffer += ch;
-                term.write(ch);
+        function runCommand(cmd) {
+            const args = cmd.trim().split(/\s+/);
+            const command = args[0];
+            switch (command) {
+                case 'help': term.writeln('\r\nAvailable commands: help, clear, echo, ls, cd, pwd, date, whoami, about, exit'); break;
+                case 'clear': term.clear(); break;
+                case 'echo': term.writeln(args.slice(1).join(' ')); break;
+                case 'ls': term.writeln('Desktop  Documents  Downloads  Music  Pictures  Videos'); break;
+                case 'cd':
+                    if (args[1]) {
+                        if (args[1] === '..') cwd = cwd === '/' ? '/' : cwd.split('/').slice(0, -1).join('/') || '/';
+                        else cwd = cwd === '/' ? `/${args[1]}` : `${cwd}/${args[1]}`;
+                    }
+                    break;
+                case 'pwd': term.writeln(cwd); break;
+                case 'date': term.writeln(new Date().toString()); break;
+                case 'whoami': term.writeln('olive'); break;
+                case 'about': term.writeln('OliveOS Terminal - Simulated shell.'); break;
+                case 'exit': term.writeln('logout'); setTimeout(() => window.close(), 500); break;
+                case 'olive': term.writeln(`.:^~~~!!!~~~^:.            olive@oliveos\n       :^!!!!!!!!!~^^:::^^^:         --------------------------\n    .^!!!!!!!!!!^.         .:^.      OS:      Win32\n   ^!!!!!!!!!!~.             .~:     Host:    localhost\n  ~!!!!!!!!!!~                 ~^    Kernel:  Mozilla/5.0 (Windows NT 1...\n ~!!!!!!!!~~!^                 ^~^   Uptime:  0s\n^!!!!!!!~~~~~~                 ^~~:  Packages: 42 (npm)\n!!!!!!~~~~~~~~^               ^~^^^  Shell:   simulated\n~!!~~~~~~~~~~~~~:           .^~^^^^  Resolution: 1536x864\n^!~~~~~~~~~~~~~~~~^:.....:^~~^^^^^:  DE:      OliveOS Desktop Environment\n ~!~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^   WM:      Olivindo 1.0\n  ~!~~~~~~~~~~~~~~~~~~^^^^^^^^^^^    WM Theme: Default Theme - Dark\n   ^~~~~~~~~~~~~~~~~~^^^^^^^^^^:     Terminal: OliveOS Terminal / UNIX like\n    .^~~~~~~~~~~~~^^^^^^^^^^^:       Terminal Font: Monospace\n       .^~~~~~~~~^^^^^^^^^:.         CPU:     N/A\n          ..:^^^^^^^^::.             GPU:     N/A\n                                     Memory:  N/A\n                                     Network: N/A\n\n                `); break;
+                default: if (command.trim() !== '') term.writeln(`${command}: command not found`);
             }
         }
-    });
+        printPrompt();
+        term.onData(data => {
+            for (let ch of data) {
+                if (ch === '\r') {
+                    runCommand(buffer);
+                    buffer = '';
+                    printPrompt();
+                } else if (ch === '\u007F') { // Backspace
+                    if (buffer.length > 0) {
+                        buffer = buffer.slice(0, -1);
+                        term.write('\b \b');
+                    }
+                } else if (ch >= ' ' && ch <= '~') {
+                    buffer += ch;
+                    term.write(ch);
+                }
+            }
+        });
+    }
 }
-
-// Add null checks for all getElementById usages to prevent JS errors if elements are missing
-function safeGet(id) {
-    return document.getElementById(id);
-}
-
-// Example fix for one usage:
-const wrapper = safeGet('taskbar_app_icons');
-if (wrapper) wrapper.innerHTML = '';
-
-// (Repeat for all getElementById usages in this file)
